@@ -6,12 +6,11 @@ use column::Column;
 pub struct RowGroup {
     // id: u32,
     columns: Vec<Column>,
-    offsets: Vec<u32>,
 }
 
 impl RowGroup {
-    pub fn new(columns: Vec<Column>, offsets: Vec<u32>) -> Self {
-        RowGroup {columns, offsets}
+    pub fn new(columns: Vec<Column>) -> Self {
+        RowGroup { columns }
     }
 }
 
@@ -22,7 +21,8 @@ impl serde::Serialize for RowGroup {
             v.push(col.to_string());
         }
 
-        v.push("\n".to_string());
-        v.join("\n")
+        let mut s = v.join("\n");
+        s.push_str("\n");
+        s
     }
 }

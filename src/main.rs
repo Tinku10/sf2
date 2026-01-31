@@ -25,7 +25,6 @@ fn main() {
                 "D".to_string(),
             ]),
         ],
-        vec![0, 10],
     )];
     let f = footer::Footer::new(
         vec![
@@ -37,7 +36,9 @@ fn main() {
         2,
     );
 
-    SF2::new(rg, f).write("./data/test.sf2");
+    util::csv_to_sf2("./data/addresses.csv").unwrap().write("./data/test.sf2").unwrap();
+
+    // SF2::new(rg, f).write("./data/test.sf2");
 
     // println!("{}", f.to_string());
 }

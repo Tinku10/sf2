@@ -16,6 +16,7 @@ impl SF2 {
     }
 
     pub fn write(&self, file_path: &str) -> std::io::Result<()> {
+        println!("writing");
         let mut f = File::create(file_path)?;
         let mut bytes = 0;
 
