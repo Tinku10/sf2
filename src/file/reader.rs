@@ -34,10 +34,10 @@ impl SF2Reader {
             .collect()
     }
 
-    fn parse_offsets(line: &str) -> Vec<u32> {
+    fn parse_offsets(bytes: &Vec<u8>) -> Vec<u32> {
         let mut v = Vec::new();
-        for chunk in line.as_bytes().chunks_exact(5) {
-            v.push(u32::from_le_bytes(chunk[..4].try_into().unwrap()));
+        for chunk in bytes.chunks_exact(4) {
+            v.push(u32::from_le_bytes(chunk.try_into().unwrap()));
         }
         v
     }
@@ -54,64 +54,45 @@ impl SF2Reader {
 
         let footer_offset = u32::from_le_bytes(footer_offset);
 
-        f.seek(SeekFrom::Start(footer_offset as u64));
+        f.seek(SeekFrom::Start(footer_offset as u64))?;
 
         let mut br = BufReader::new(f);
 
+        // Skip !SCHEMA=
+        br.consume(8);
+        // Can be interpreted as valid text data
         let mut s = String::new();
+        br.read_line(&mut s)?;
+        let schema = Self::parse_schema(&s);
+        println!("{:?}", schema);
 
-        br.read_line(&mut s);
-        let schema = s
-            .strip_prefix("!SCHEMA=")
-            .ok_or_else(|| std::io::ErrorKind::InvalidData)?
-            .to_string();
+        // Skip !ROW_COUNT=
+        br.consume(11);
+        let mut s = [0u8; 4];
+        br.read_exact(&mut s)?;
+        let row_count = u32::from_le_bytes(s);
+        br.consume(1);
 
-        let schema = Self::parse_schema(&schema);
-        s.clear();
+        // Skip !COLUMN_COUNT=
+        br.consume(14);
+        let mut s = [0u8; 4];
+        br.read_exact(&mut s)?;
+        br.consume(1);
+        let col_count = u32::from_le_bytes(s);
 
-        br.read_line(&mut s);
-        let offsets = s
-            .strip_prefix("!ROWGROUP_OFFSETS=")
-            .ok_or_else(|| std::io::ErrorKind::InvalidData)?
-            .to_string();
+        // Skip !ROWGROUP_COUNT=
+        br.consume(16);
+        let mut s = [0u8; 4];
+        br.read_exact(&mut s)?;
+        br.consume(1);
+        let row_group_count = u32::from_le_bytes(s);
 
-        let offsets = Self::parse_offsets(&offsets);
-        s.clear();
-
-
-        br.read_line(&mut s);
-
-        let row_count = u32::from_le_bytes(
-            s.strip_prefix("!ROW_COUNT=")
-                .ok_or_else(|| std::io::ErrorKind::InvalidData)?
-                .trim()
-                .as_bytes()[..4]
-                .try_into()
-                .unwrap(),
-        );
-        s.clear();
-
-        br.read_line(&mut s);
-        let col_count = u32::from_le_bytes(
-            s.strip_prefix("!COLUMN_COUNT=")
-                .ok_or_else(|| std::io::ErrorKind::InvalidData)?
-                .trim()
-                .as_bytes()[..4]
-                .try_into()
-                .unwrap(),
-        );
-        s.clear();
-
-        br.read_line(&mut s);
-        let row_group_count = u32::from_le_bytes(
-            s.strip_prefix("!ROWGROUP_COUNT=")
-                .ok_or_else(|| std::io::ErrorKind::InvalidData)?
-                .trim()
-                .as_bytes()[..4]
-                .try_into()
-                .unwrap(),
-        );
-
+        // Skip !ROWGROUP_OFFSETS=
+        br.consume(18);
+        let mut s = vec![0u8; (row_group_count * 4) as usize];
+        br.read_exact(&mut s)?;
+        br.consume(1);
+        let offsets = Self::parse_offsets(&s);
 
         let footer = Footer::new(schema, offsets, row_count, col_count, row_group_count);
         let meta = SF2Meta { footer };
@@ -123,46 +104,7 @@ impl SF2Reader {
         &self.meta.footer.schema()
     }
 
-    // pub fn head(&mut self, rows: Option<u32>) -> Option<Vec<Vec<String>>> {
-    //     // Read up to first two rows
-    //     let col_count = self.meta.footer.col_count() as usize;
-    //     let mut offsets = self.meta.footer.offsets().clone();
-
-    //     let mut rg = 0;
-
-    //     let row_count = match rows {
-    //         Some(x) => std::cmp::min(x, self.meta.row_count()),
-    //         None => std::cmp::min(2, self.meta.row_count()),
-    //     } as usize;
-
-    //     // TODO: Find a way to cast the data to the correct types
-    //     // This is not the right place to cast it, but the stored type should be created in a way
-    //     // to support it
-    //     let mut result = vec![Vec::new(); row_count];
-
-    //     for j in 0..row_count {
-    //         for i in 0..col_count {
-    //             let idx: usize = (rg * col_count + i) as usize;
-    //             let offset = offsets[idx];
-    //             self.file.seek(SeekFrom::Start(offset.into()));
-
-    //             let mut item = Vec::new();
-    //             let bytes = self.file.read_until(b',', &mut item).ok()?;
-    //             item = item.strip_suffix(&[b',']).unwrap_or(&item).to_vec();
-
-    //             result[j].push(String::from_utf8(item).ok()?);
-
-    //             offsets[idx] += bytes as u32;
-    //         }
-
-    //         if self.file.peek(1).unwrap() == b"\n" {
-    //             rg += 1;
-    //         }
-    //     }
-    //     Some(result)
-    // }
-
-    pub fn iter(&mut self) -> RowGroupIterator {
+    pub fn iter(&mut self) -> RowGroupIterator<'_> {
         let offsets = self.meta.footer.offsets().clone();
         RowGroupIterator {
             reader: self,
@@ -184,7 +126,7 @@ impl<'a> RowGroupIterator<'a> {
 
         let mut columns = Vec::new();
 
-        for i in 0..col_count {
+        for _ in 0..col_count {
             let mut line = String::new();
             br.read_line(&mut line)?;
             let mut v = line.split(',').map(|s| s.to_string()).collect::<Vec<_>>();
@@ -215,27 +157,6 @@ impl<'a> Iterator for RowGroupIterator<'a> {
         // to support it
         // let mut result = Vec::with_capacity(col_count);
         // let mut result = vec![Vec::with_capacity(footer::ROWGROUP_SIZE); col_count];
-
         Some(self.parse_rowgroup())
-        // for i in 0..col_count {
-        //     let idx: usize = (self.row_group * col_count + i) as usize;
-        //     let offset = self.offsets[idx];
-        //     br.seek(SeekFrom::Start(offset.into()));
-
-        //     let mut item = Vec::new();
-        //     let bytes = br.read_until(b',', &mut item).ok()?;
-        //     item = item.strip_suffix(&[b',']).unwrap_or(&item).to_vec();
-
-        //     result.push(String::from_utf8(item).ok()?);
-
-        //     self.offsets[idx] += bytes as u32;
-        //     // offsets[idx] += bytes as u32;
-        // }
-
-        // if br.peek(1).unwrap() == b"\n" {
-        //     self.row_group += 1;
-        // }
-
-        // self.row_count += 1;
     }
 }

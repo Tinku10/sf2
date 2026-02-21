@@ -1,7 +1,7 @@
 use crate::serde;
 use std::fmt::Write;
 
-pub(crate) const ROWGROUP_SIZE: usize = 2;
+pub(crate) const ROWGROUP_SIZE: usize = 10;
 
 #[derive(Debug)]
 pub(crate) struct Footer {
@@ -58,14 +58,6 @@ impl serde::Serialize for Footer {
         s.extend_from_slice(b"!SCHEMA=");
         for (k, v) in &self.schema {
             s.extend_from_slice(format!("{}:{}", k, v).as_bytes());
-            // write!(s, b"{}:{}", k, v);
-            s.push(b',')
-        }
-        s.push(b'\n');
-
-        s.extend_from_slice(b"!ROWGROUP_OFFSETS=");
-        for offset in &self.offsets {
-            s.extend(offset.to_le_bytes());
             s.push(b',')
         }
         s.push(b'\n');
@@ -79,12 +71,13 @@ impl serde::Serialize for Footer {
         s.extend(self.col_count.to_le_bytes());
         s.push(b'\n');
         s.extend_from_slice(b"!ROWGROUP_COUNT=");
-        s.extend(row_group_cnt.to_le_bytes());
+        s.extend(row_group_cnt.to_le_bytes().iter());
         s.push(b'\n');
-        // write!(s, b"!RCOUNT={}\n", self.offsets.len().as_le_bytes());
-        // write!(s, b"!CCOUNT={}\n", self.col_count.as_le_bytes());
-
-        // s.push_str("!FOOTER=");
+        s.extend_from_slice(b"!ROWGROUP_OFFSETS=");
+        for offset in &self.offsets {
+            s.extend(offset.to_le_bytes());
+        }
+        s.push(b'\n');
 
         s
     }
