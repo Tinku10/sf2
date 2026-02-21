@@ -16,8 +16,12 @@ pub struct SF2Reader {
 pub struct RowGroupIterator<'a> {
     reader: &'a mut SF2Reader,
     offsets: Vec<u32>,
-    row_count: u32,
-    row_group: usize,
+    index: usize,
+}
+
+pub struct RowIterator {
+    row_group: Option<RowGroup>,
+    row: usize,
 }
 
 impl SF2Reader {
@@ -64,7 +68,6 @@ impl SF2Reader {
         let mut s = String::new();
         br.read_line(&mut s)?;
         let schema = Self::parse_schema(&s);
-        println!("{:?}", schema);
 
         // Skip !ROW_COUNT=
         br.consume(11);
@@ -104,15 +107,15 @@ impl SF2Reader {
         &self.meta.footer.schema()
     }
 
-    pub fn iter(&mut self) -> RowGroupIterator<'_> {
-        let offsets = self.meta.footer.offsets().clone();
-        RowGroupIterator {
-            reader: self,
-            offsets,
-            row_count: 0,
-            row_group: 0,
-        }
-    }
+    // pub fn iter(self) -> RowGroupIterator<'_> {
+    //     let offsets = self.meta.footer.offsets().clone();
+    //     RowGroupIterator {
+    //         reader: self,
+    //         offsets,
+    //         curr_row_group: None,
+    //         index: 0,
+    //     }
+    // }
 }
 
 impl<'a> RowGroupIterator<'a> {
@@ -120,7 +123,7 @@ impl<'a> RowGroupIterator<'a> {
         let br = &mut self.reader.file;
         let meta = &self.reader.meta;
         // Go to the beginning of the row group
-        br.seek(SeekFrom::Start(self.offsets[self.row_group] as u64));
+        br.seek(SeekFrom::Start(self.offsets[self.index] as u64));
         // Parse col_count lines
         let col_count = meta.footer.col_count() as usize;
 
@@ -134,10 +137,17 @@ impl<'a> RowGroupIterator<'a> {
             columns.push(Column::new(v));
         }
 
-        self.row_group += 1;
+        self.index += 1;
 
         Ok(RowGroup::new(columns))
     }
+
+    // pub fn iter(self) -> RowIterator<'_> {
+    //     RowIterator {
+    //         row_group: self.curr_row_group.as_ref(),
+    //         row: 0,
+    //     }
+    // }
 }
 
 impl<'a> Iterator for RowGroupIterator<'a> {
@@ -148,15 +158,63 @@ impl<'a> Iterator for RowGroupIterator<'a> {
         let meta = &self.reader.meta;
         let col_count = meta.footer.col_count() as usize;
 
-        if self.row_group as u32 == meta.footer.row_group_count() {
+        if self.index as u32 == meta.footer.row_group_count() {
             return None;
         }
 
         // TODO: Find a way to cast the data to the correct types
         // This is not the right place to cast it, but the stored type should be created in a way
         // to support it
-        // let mut result = Vec::with_capacity(col_count);
-        // let mut result = vec![Vec::with_capacity(footer::ROWGROUP_SIZE); col_count];
+        // self.curr_row_group = self.parse_rowgroup().ok();
+        // Not what I want, but there seems to be no good way to store the current rowgroup and
+        // return a reference to it
+        // Some(Ok(self.curr_row_group.clone()?))
         Some(self.parse_rowgroup())
+    }
+}
+
+impl Iterator for RowIterator {
+    type Item = std::io::Result<Vec<String>>;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        let columns = self.row_group.as_ref()?.columns();
+
+        if self.row >= columns[0].records().len() {
+            return None;
+        }
+
+        let row: Vec<String> = columns
+            .iter()
+            .map(|col| col.records()[self.row].clone())
+            .collect();
+
+        self.row += 1;
+        Some(Ok(row))
+    }
+}
+
+impl<'a> IntoIterator for &'a mut SF2Reader {
+    type Item = std::io::Result<RowGroup>;
+    type IntoIter = RowGroupIterator<'a>;
+
+    fn into_iter(self) -> Self::IntoIter {
+        let offsets = self.meta.footer.offsets().clone();
+        RowGroupIterator {
+            reader: self,
+            offsets,
+            index: 0,
+        }
+    }
+}
+
+impl IntoIterator for RowGroup {
+    type Item = std::io::Result<Vec<String>>;
+    type IntoIter = RowIterator;
+
+    fn into_iter(self) -> Self::IntoIter {
+        RowIterator {
+            row_group: Some(self),
+            row: 0,
+        }
     }
 }

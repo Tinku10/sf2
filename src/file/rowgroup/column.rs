@@ -1,6 +1,6 @@
 use crate::serde;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub(crate) struct Column {
     // id: u32,
     records: Vec<String>,
@@ -9,6 +9,10 @@ pub(crate) struct Column {
 impl Column {
     pub fn new(records: Vec<String>) -> Self {
         Column { records }
+    }
+
+    pub fn records(&self) -> &Vec<String> {
+        &self.records
     }
 }
 

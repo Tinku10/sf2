@@ -3,7 +3,7 @@ pub mod column;
 use crate::serde;
 use column::Column;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct RowGroup {
     // id: u32,
     columns: Vec<Column>,
@@ -12,6 +12,10 @@ pub struct RowGroup {
 impl RowGroup {
     pub fn new(columns: Vec<Column>) -> Self {
         RowGroup { columns }
+    }
+
+    pub fn columns(&self) -> &Vec<Column> {
+        &self.columns
     }
 }
 
