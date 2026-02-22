@@ -28,3 +28,14 @@ impl serde::Serialize for Column {
         buf
     }
 }
+
+impl serde::Deserialize for Column {
+    fn from_bytes(bytes: &[u8]) -> std::io::Result<Self> {
+        Ok(Column {
+            records: String::from_utf8_lossy(bytes)
+                .split(',')
+                .map(|s| s.to_string())
+                .collect::<Vec<_>>(),
+        })
+    }
+}
