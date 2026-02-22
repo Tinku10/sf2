@@ -31,11 +31,11 @@ impl serde::Serialize for Column {
 
 impl serde::Deserialize for Column {
     fn from_bytes(bytes: &[u8]) -> std::io::Result<Self> {
-        Ok(Column {
-            records: String::from_utf8_lossy(bytes)
-                .split('\x1F')
-                .map(|s| s.to_string())
-                .collect::<Vec<_>>(),
-        })
+        let mut records = String::from_utf8_lossy(bytes)
+            .split('\x1F')
+            .map(|s| s.to_string())
+            .collect::<Vec<_>>();
+        records.pop();
+        Ok(Column { records })
     }
 }

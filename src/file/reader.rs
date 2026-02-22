@@ -67,6 +67,7 @@ impl PlankReader {
         br.read_to_end(&mut footer_buf);
 
         let footer = Footer::from_bytes(&footer_buf)?;
+
         let meta = PlankMeta { footer };
 
         Ok(Self { file: br, meta })
@@ -87,38 +88,6 @@ impl PlankReader {
     // }
 }
 
-impl<'a> RowGroupIterator<'a> {
-    fn parse_rowgroup(&mut self) -> std::io::Result<RowGroup> {
-        let br = &mut self.reader.file;
-        let meta = &self.reader.meta;
-        // Go to the beginning of the row group
-        br.seek(SeekFrom::Start(self.offsets[self.index] as u64));
-        // Parse col_count lines
-        let col_count = meta.footer.col_count() as usize;
-
-        let mut columns = Vec::new();
-
-        for _ in 0..col_count {
-            let mut line = String::new();
-            br.read_line(&mut line)?;
-            let mut v = line.split(',').map(|s| s.to_string()).collect::<Vec<_>>();
-            v.pop();
-            columns.push(Column::new(v));
-        }
-
-        self.index += 1;
-
-        Ok(RowGroup::new(columns))
-    }
-
-    // pub fn iter(self) -> RowIterator<'_> {
-    //     RowIterator {
-    //         row_group: self.curr_row_group.as_ref(),
-    //         row: 0,
-    //     }
-    // }
-}
-
 impl<'a> Iterator for RowGroupIterator<'a> {
     type Item = std::io::Result<RowGroup>;
 
@@ -127,7 +96,7 @@ impl<'a> Iterator for RowGroupIterator<'a> {
         let meta = &self.reader.meta;
         let col_count = meta.footer.col_count() as usize;
 
-        if self.index as u32 == meta.footer.row_group_count() {
+        if self.index as u32 >= meta.footer.row_group_count() {
             return None;
         }
 
@@ -138,7 +107,20 @@ impl<'a> Iterator for RowGroupIterator<'a> {
         // Not what I want, but there seems to be no good way to store the current rowgroup and
         // return a reference to it
         // Some(Ok(self.curr_row_group.clone()?))
-        Some(self.parse_rowgroup())
+        let br = &mut self.reader.file;
+        let meta = &self.reader.meta;
+        // Go to the beginning of the row group
+        br.seek(SeekFrom::Start(self.offsets[self.index] as u64));
+        // Parse col_count lines
+        let col_count = meta.footer.col_count() as usize;
+
+        let row_group_size = self.offsets[self.index + 1] - self.offsets[self.index];
+
+        let mut buf = vec![0u8; row_group_size as usize];
+        br.read(&mut buf);
+
+        self.index += 1;
+        Some(RowGroup::from_bytes(&buf))
     }
 }
 

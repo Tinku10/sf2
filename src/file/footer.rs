@@ -88,7 +88,7 @@ impl serde::Serialize for Footer {
         }
         s.push(b'\n');
 
-        let row_group_cnt = self.offsets.len() as u32;
+        let row_group_cnt = self.row_group_count as u32;
 
         s.extend_from_slice(b"!ROW_COUNT=");
         s.extend(self.row_count().to_le_bytes());
@@ -105,8 +105,6 @@ impl serde::Serialize for Footer {
         }
         s.push(b'\n');
 
-        println!("source======={:x?}========", s);
-
         let checksum = Sha256::digest(&s);
         s.extend_from_slice(b"!CHECKSUM=");
         s.extend_from_slice(&checksum.to_vec());
@@ -121,49 +119,51 @@ impl serde::Deserialize for Footer {
         let mut br = BufReader::new(Cursor::new(bytes));
 
         let before = br.stream_position()?;
+
         // Skip !SCHEMA=
-        br.consume(8);
+        // br.consume(8);
+        br.seek(SeekFrom::Current(8))?;
         // Can be interpreted as valid text data
         let mut s = String::new();
         br.read_line(&mut s)?;
         let schema = Self::parse_schema(&s);
 
         // Skip !ROW_COUNT=
-        br.consume(11);
+        br.seek(SeekFrom::Current(11))?;
         let mut s = [0u8; 4];
         br.read_exact(&mut s)?;
         let row_count = u32::from_le_bytes(s);
-        br.consume(1);
+        br.seek(SeekFrom::Current(1))?;
 
         // Skip !COLUMN_COUNT=
-        br.consume(14);
+        br.seek(SeekFrom::Current(14))?;
         let mut s = [0u8; 4];
         br.read_exact(&mut s)?;
-        br.consume(1);
+        br.seek(SeekFrom::Current(1))?;
         let col_count = u32::from_le_bytes(s);
 
         // Skip !ROWGROUP_COUNT=
-        br.consume(16);
+        br.seek(SeekFrom::Current(16))?;
         let mut s = [0u8; 4];
         br.read_exact(&mut s)?;
-        br.consume(1);
+        br.seek(SeekFrom::Current(1))?;
         let row_group_count = u32::from_le_bytes(s);
 
         // Skip !ROWGROUP_OFFSETS=
-        br.consume(18);
-        let mut s = vec![0u8; (row_group_count * 4) as usize];
+        br.seek(SeekFrom::Current(18))?;
+        let mut s = vec![0u8; ((row_group_count + 1) * 4) as usize];
         br.read_exact(&mut s)?;
-        br.consume(1);
+        br.seek(SeekFrom::Current(1))?;
         let offsets = Self::parse_offsets(&s);
 
         let after = br.stream_position()?;
 
         // Skip !CHECKSUM=
-        br.consume(10);
+        br.seek(SeekFrom::Current(10))?;
         // Sha256 is 32 bytes
         let mut s = [0u8; 32];
         br.read(&mut s);
-        br.consume(1);
+        br.seek(SeekFrom::Current(1))?;
 
         br.seek(SeekFrom::Start(before))?;
 

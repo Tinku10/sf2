@@ -42,7 +42,6 @@ impl PlankWriter {
         self.file.write_all(b"!FOOTER_OFFSET=")?;
         self.file.write_all(&before.to_le_bytes())?;
         self.file.write_all(b"\n");
-        println!("{}-----------{:0x?}", before, before.to_le_bytes());
         Ok(())
     }
 
@@ -83,10 +82,13 @@ impl PlankWriter {
         }
 
         for rg in &row_groups {
-            println!("{:?}", rg);
             offsets.push(curr_offset);
             curr_offset = self.write_rowgroup(rg)?
         }
+
+        // Add an extra offset pointing to the beginning of the footer
+        // This will be used to know the byte size of any rowgroup N (offsets[N + 1] - offsets[N])
+        offsets.push(curr_offset);
 
         let footer = Footer::new(schema, offsets, row_count, col_count, row_groups.len() as u32);
         self.write_footer(&footer)?;
