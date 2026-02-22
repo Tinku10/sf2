@@ -41,6 +41,7 @@ The footer contains complete file metadata and is located at the end of the file
 !COLUMN_COUNT=<binary: u32 LE>
 !ROWGROUP_COUNT=<binary: u32 LE>
 !ROWGROUP_OFFSETS=<binary: u32[] LE>
+!CHECKSUM=<binary: u8[32]>
 !FOOTER_OFFSET=<binary: u32>
 ```
 
@@ -55,6 +56,7 @@ The footer contains complete file metadata and is located at the end of the file
 | `!COLUMN_COUNT` | `u32` LE | Number of columns in the file |
 | `!ROWGROUP_COUNT` | `u32` LE | Number of row groups |
 | `!ROWGROUP_OFFSETS` | `u32[]` LE | Byte offset of each row group from the start of the file |
+| `!CHECKSUM` | `u8[32]` | Checksum of the footer used for validation |
 | `!FOOTER_OFFSET` | `u32` LE | Byte offset of the begining of the footer section |
 
 ---

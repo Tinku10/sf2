@@ -22,7 +22,7 @@ impl serde::Serialize for Column {
 
         for record in &self.records {
             buf.extend_from_slice(record.as_bytes());
-            buf.push(b',');
+            buf.push(0x1F);
         }
 
         buf
@@ -33,7 +33,7 @@ impl serde::Deserialize for Column {
     fn from_bytes(bytes: &[u8]) -> std::io::Result<Self> {
         Ok(Column {
             records: String::from_utf8_lossy(bytes)
-                .split(',')
+                .split('\x1F')
                 .map(|s| s.to_string())
                 .collect::<Vec<_>>(),
         })

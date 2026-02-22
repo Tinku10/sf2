@@ -1,8 +1,10 @@
 use crate::serde;
+use sha2::{Digest, Sha256};
 use std::fmt::Write;
-use std::io::{BufRead, Read, Cursor, BufReader};
+use std::io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom};
 
 pub(crate) const ROWGROUP_SIZE: usize = 10;
+const PLANK_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
 pub(crate) struct Footer {
@@ -53,7 +55,7 @@ impl Footer {
 
     fn parse_schema(line: &str) -> Vec<(String, String)> {
         line.trim()
-            .split(',')
+            .split('\x1F')
             .filter_map(|item| {
                 let mut it = item.split(':');
                 match (it.next(), it.next()) {
@@ -77,10 +79,12 @@ impl serde::Serialize for Footer {
     fn to_bytes(&self) -> Vec<u8> {
         let mut s = Vec::new();
 
+        // s.extend_from_slice(format!("!PLANK_VERSION={}", PLANK_VERSION).as_bytes());
+        // s.push(b'\n');
         s.extend_from_slice(b"!SCHEMA=");
         for (k, v) in &self.schema {
             s.extend_from_slice(format!("{}:{}", k, v).as_bytes());
-            s.push(b',')
+            s.push(0x1F)
         }
         s.push(b'\n');
 
@@ -101,6 +105,13 @@ impl serde::Serialize for Footer {
         }
         s.push(b'\n');
 
+        println!("source======={:x?}========", s);
+
+        let checksum = Sha256::digest(&s);
+        s.extend_from_slice(b"!CHECKSUM=");
+        s.extend_from_slice(&checksum.to_vec());
+        s.push(b'\n');
+
         s
     }
 }
@@ -109,6 +120,7 @@ impl serde::Deserialize for Footer {
     fn from_bytes(bytes: &[u8]) -> std::io::Result<Self> {
         let mut br = BufReader::new(Cursor::new(bytes));
 
+        let before = br.stream_position()?;
         // Skip !SCHEMA=
         br.consume(8);
         // Can be interpreted as valid text data
@@ -144,6 +156,33 @@ impl serde::Deserialize for Footer {
         br.consume(1);
         let offsets = Self::parse_offsets(&s);
 
-        Ok(Footer::new(schema, offsets, row_count, col_count, row_group_count))
+        let after = br.stream_position()?;
+
+        // Skip !CHECKSUM=
+        br.consume(10);
+        // Sha256 is 32 bytes
+        let mut s = [0u8; 32];
+        br.read(&mut s);
+        br.consume(1);
+
+        br.seek(SeekFrom::Start(before))?;
+
+        let mut buf = vec![0u8; (after - before) as usize];
+        br.read_exact(&mut buf)?;
+
+        if s != Sha256::digest(&buf)[..] {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "checksums do not match",
+            ));
+        }
+
+        Ok(Footer::new(
+            schema,
+            offsets,
+            row_count,
+            col_count,
+            row_group_count,
+        ))
     }
 }
