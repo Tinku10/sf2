@@ -37,3 +37,30 @@ The example above is organized into a few sections:
     A footer contains the complete metadata. It contains the table headers along with offsets to each row group along with the offsets to each row in the rowgroup.
 
 It is not a complete text format. Numbers are encoded in binary.
+
+## Example
+
+### Reading all the rows
+
+```rs
+
+let mut f = SF2Reader::open("/path/to/file.sf2")?;
+
+for rg in &mut f {
+    if let Ok(rg) = rg {
+        for row in rg {
+            println!("{:?}", row);
+        }
+    }
+}
+
+```
+
+### Converting a CSV into SF2
+
+```rs
+
+let mut f = SF2Writer::new("/path/to/file.sf2")?;
+f.write_from_csv("/path/to/file.csv")?;
+
+```
