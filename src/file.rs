@@ -6,11 +6,11 @@ pub mod writer;
 use footer::Footer;
 
 #[derive(Debug)]
-pub struct SF2Meta {
+pub struct PlankMeta {
     footer: Footer,
 }
 
-impl SF2Meta {
+impl PlankMeta {
     pub fn schema(&self) -> &Vec<(String, String)> {
         self.footer.schema()
     }

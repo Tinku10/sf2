@@ -6,14 +6,14 @@ use std::path::Path;
 use crate::file::footer::{self, Footer};
 use crate::file::rowgroup::column::Column;
 use crate::file::rowgroup::RowGroup;
-use crate::file::SF2Meta;
+use crate::file::PlankMeta;
 use crate::serde::Serialize;
 
-pub struct SF2Writer {
+pub struct PlankWriter {
     file: BufWriter<File>,
 }
 
-impl SF2Writer {
+impl PlankWriter {
     pub fn new<P: AsRef<Path>>(path: P) -> std::io::Result<Self> {
         let mut file = File::create(path)?;
         Ok(Self {

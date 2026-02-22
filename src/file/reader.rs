@@ -6,16 +6,16 @@ use std::path::Path;
 use crate::file::footer::{self, Footer};
 use crate::file::rowgroup::column::Column;
 use crate::file::rowgroup::RowGroup;
-use crate::file::SF2Meta;
+use crate::file::PlankMeta;
 use crate::serde::Deserialize;
 
-pub struct SF2Reader {
+pub struct PlankReader {
     file: BufReader<File>,
-    meta: SF2Meta,
+    meta: PlankMeta,
 }
 
 pub struct RowGroupIterator<'a> {
-    reader: &'a mut SF2Reader,
+    reader: &'a mut PlankReader,
     offsets: Vec<u32>,
     index: usize,
 }
@@ -25,7 +25,7 @@ pub struct RowIterator {
     row: usize,
 }
 
-impl SF2Reader {
+impl PlankReader {
     fn parse_schema(line: &str) -> Vec<(String, String)> {
         line.trim()
             .split(',')
@@ -67,7 +67,7 @@ impl SF2Reader {
         br.read_to_end(&mut footer_buf);
 
         let footer = Footer::from_bytes(&footer_buf)?;
-        let meta = SF2Meta { footer };
+        let meta = PlankMeta { footer };
 
         Ok(Self { file: br, meta })
     }
@@ -162,7 +162,7 @@ impl Iterator for RowIterator {
     }
 }
 
-impl<'a> IntoIterator for &'a mut SF2Reader {
+impl<'a> IntoIterator for &'a mut PlankReader {
     type Item = std::io::Result<RowGroup>;
     type IntoIter = RowGroupIterator<'a>;
 
