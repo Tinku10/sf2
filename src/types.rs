@@ -9,7 +9,7 @@ pub enum PlankType {
     Int64,
     // Float64,
     Bool,
-    // List(Box<PlankType>),
+    List(Box<PlankType>),
     Struct(Vec<PlankField>),
 }
 
@@ -25,17 +25,20 @@ pub enum PlankData {
     Int32(i32),
     Int64(i64),
     Bool(bool),
+    List(Vec<PlankData>),
     Struct(Vec<PlankData>),
 }
 
 impl PlankType {
     pub fn encoded_size(&self) -> usize {
+        // 1 byte is always reserved for type_id (u8)
         match self {
             Self::Str => 1,
             Self::Int32 => 1,
             Self::Int64 => 1,
             Self::Bool => 1,
             Self::Struct(fields) => 1 + 4 + fields.iter().map(|f| f.encoded_size()).sum::<usize>(),
+            Self::List(list_type) => 1 + list_type.encoded_size(),
         }
     }
 
@@ -49,13 +52,13 @@ impl PlankType {
         if value.parse::<bool>().is_ok() {
             return PlankType::Bool;
         }
-        if let Ok(t) = PlankType::infer_struct_type(value) {
+        if let Ok(t) = PlankType::infer_extended_type(value) {
             return t;
         }
         PlankType::Str
     }
 
-    fn infer_struct_type(s: &str) -> std::io::Result<PlankType> {
+    fn infer_extended_type(s: &str) -> std::io::Result<PlankType> {
         let s = serde_json::from_str(s)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         match s {
@@ -74,10 +77,28 @@ impl PlankType {
             serde_json::Value::Object(o) => {
                 let fields = o
                     .iter()
-                    .map(|(k, v)| Ok(PlankField::new(k, Self::infer_struct_type(&v.to_string())?)))
+                    .map(|(k, v)| {
+                        Ok(PlankField::new(
+                            k,
+                            Self::infer_extended_type(&v.to_string())?,
+                        ))
+                    })
                     .collect::<std::io::Result<Vec<PlankField>>>()?;
 
                 Ok(PlankType::Struct(fields))
+            }
+            serde_json::Value::Array(a) => {
+                let items = a
+                    .iter()
+                    .map(|v| Self::infer_extended_type(&v.to_string()))
+                    .collect::<std::io::Result<Vec<_>>>()?;
+
+                // if !(items.is_empty() || items.iter().all(|e| items[0] == e)) {
+                //     Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "list should be homogeneous"))
+                // }
+                
+                // Need a way to infer type if the list is empty
+                Ok(PlankType::List(Box::new(items[0].clone())))
             }
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -110,7 +131,7 @@ impl PlankField {
             PlankType::Int64
         } else if value.parse::<bool>().is_ok() {
             PlankType::Bool
-        } else if let Ok(t) = PlankType::infer_struct_type(value) {
+        } else if let Ok(t) = PlankType::infer_extended_type(value) {
             t
         } else {
             PlankType::Str
@@ -120,40 +141,47 @@ impl PlankField {
 }
 
 // This is mostly not needed, plank files are encoded with numeric values for types
-impl FromStr for PlankType {
-    type Err = std::io::Error;
+// impl FromStr for PlankType {
+//     type Err = std::io::Error;
 
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "Str" => Ok(Self::Str),
-            "Int32" => Ok(Self::Int32),
-            "Int64" => Ok(Self::Int64),
-            "Bool" => Ok(Self::Bool),
-            _ => Err(std::io::Error::new(
-                std::io::ErrorKind::InvalidData,
-                format!("unable to infer type of {}", s),
-            )),
-        }
-    }
-}
+//     fn from_str(s: &str) -> Result<Self, Self::Err> {
+//         match s {
+//             "Str" => Ok(Self::Str),
+//             "Int32" => Ok(Self::Int32),
+//             "Int64" => Ok(Self::Int64),
+//             "Bool" => Ok(Self::Bool),
+//             _ => Err(std::io::Error::new(
+//                 std::io::ErrorKind::InvalidData,
+//                 format!("unable to infer type of {}", s),
+//             )),
+//         }
+//     }
+// }
 
-impl From<&PlankData> for PlankType {
-    fn from(data: &PlankData) -> Self {
-        match data {
-            PlankData::Str(_) => PlankType::Str,
-            PlankData::Int32(_) => PlankType::Int32,
-            PlankData::Int64(_) => PlankType::Int64,
-            PlankData::Bool(_) => PlankType::Bool,
-            PlankData::Struct(s) => {
-                let mut v = Vec::new();
-                for field in s {
-                    v.push(PlankField::new("", PlankType::from(field)))
-                }
-                PlankType::Struct(v)
-            }
-        }
-    }
-}
+// impl From<&PlankData> for PlankType {
+//     fn from(data: &PlankData) -> Self {
+//         // PlankType cannot be completely derived from PlankData without the schema
+//         // But this gets the job done for what is needed by filling the names of keys with empty
+//         // string
+//         match data {
+//             PlankData::Str(_) => PlankType::Str,
+//             PlankData::Int32(_) => PlankType::Int32,
+//             PlankData::Int64(_) => PlankType::Int64,
+//             PlankData::Bool(_) => PlankType::Bool,
+//             PlankData::Struct(s) => {
+//                 let mut v = Vec::new();
+//                 for field in s {
+//                     v.push(PlankField::new("", PlankType::from(field)))
+//                 }
+//                 PlankType::Struct(v)
+//             },
+//             PlankData::List(l) => {
+//                 let mut t = l.get(0)
+//                 PlankType::List(t)
+//             }
+//         }
+//     }
+// }
 
 impl PlankData {
     pub fn parse_value(value: &str) -> Self {
@@ -163,14 +191,14 @@ impl PlankData {
             return PlankData::Int64(n);
         } else if let Ok(b) = value.parse::<bool>() {
             return PlankData::Bool(b);
-        } else if let Ok(t) = Self::parse_struct(value) {
+        } else if let Ok(t) = Self::parse_extended_value(value) {
             return t;
         }
 
         PlankData::Str(String::from(value))
     }
 
-    fn parse_struct(s: &str) -> std::io::Result<PlankData> {
+    fn parse_extended_value(s: &str) -> std::io::Result<PlankData> {
         let s = serde_json::from_str(s)
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         match s {
@@ -189,10 +217,17 @@ impl PlankData {
             serde_json::Value::Object(o) => {
                 let fields = o
                     .iter()
-                    .map(|(_, v)| Self::parse_struct(&v.to_string()))
+                    .map(|(_, v)| Self::parse_extended_value(&v.to_string()))
                     .collect::<std::io::Result<Vec<_>>>()?;
 
                 Ok(PlankData::Struct(fields))
+            }
+            serde_json::Value::Array(a) => {
+                let items = a
+                    .iter()
+                    .map(|v| Self::parse_extended_value(&v.to_string()))
+                    .collect::<std::io::Result<Vec<_>>>()?;
+                Ok(PlankData::List(items))
             }
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
@@ -201,90 +236,6 @@ impl PlankData {
         }
     }
 }
-
-// impl PlankData {
-//     fn parse_struct_fields(s: &str, pos: &mut usize) -> std::io::Result<Vec<PlankData>> {
-//         let bytes = s.as_bytes();
-
-//         let mut v = Vec::new();
-
-//         let illformed_struct_err =
-//             std::io::Error::new(std::io::ErrorKind::InvalidData, "illformed struct");
-//         let unexpected_token_err =
-//             std::io::Error::new(std::io::ErrorKind::InvalidData, "expected token");
-
-//         if *pos >= bytes.len() {
-//             return Err(illformed_struct_err);
-//         }
-
-//         if bytes[*pos] != b'"' {
-//             return Err(unexpected_token_err);
-//         }
-//         *pos += 1;
-
-//         // Skip the keys
-//         // We are only concerned with the values
-//         while *pos < bytes.len() && bytes[*pos].is_ascii_alphanumeric() {
-//             *pos += 1;
-//         }
-
-//         if *pos >= bytes.len() {
-//             return Err(illformed_struct_err);
-//         }
-
-//         if bytes[*pos] != b'"' {
-//             return Err(unexpected_token_err);
-//         }
-//         *pos += 1;
-
-//         if *pos >= bytes.len() {
-//             return Err(illformed_struct_err);
-//         }
-
-//         if bytes[*pos] != b':' {
-//             return Err(unexpected_token_err);
-//         }
-//         *pos += 1;
-
-//         if *pos >= bytes.len() {
-//             return Err(illformed_struct_err);
-//         }
-
-//         let value = if bytes[*pos] == b'{' {
-//             let mut v = Vec::new();
-//             v.push(Self::parse_struct(&s[*pos..])?);
-//             return Ok(v);
-//         } else {
-//             let mut val = String::new();
-//             while *pos < bytes.len() && bytes[*pos] != b',' && bytes[*pos] != b'}' {
-//                 val.push(bytes[*pos] as char);
-//                 *pos += 1;
-//             }
-//             val.parse::<PlankData>()?
-//         };
-
-//         v.push(value);
-
-//         if *pos < bytes.len() && bytes[*pos] == b',' {
-//             *pos += 1;
-//         }
-
-//         Ok(v)
-//     }
-
-//         // let mut pos = 0;
-//         // let mut v = Vec::new();
-//         // if s.starts_with('{') {
-//         //     pos += 1;
-//         //     v.extend(Self::parse_struct_fields(s, &mut pos)?);
-//         //     pos += 1;
-//         //     return Ok(Self::Struct(v));
-//         // }
-//         // Err(std::io::Error::new(
-//         //     std::io::ErrorKind::InvalidData,
-//         //     "not a struct",
-//         // ))
-// }
 
 impl FromStr for PlankData {
     type Err = std::io::Error;
@@ -296,22 +247,11 @@ impl FromStr for PlankData {
             return Ok(PlankData::Int64(n));
         } else if let Ok(b) = s.parse::<bool>() {
             return Ok(PlankData::Bool(b));
-        } else if let Ok(t) = Self::parse_struct(s) {
+        } else if let Ok(t) = Self::parse_extended_value(s) {
             return Ok(t);
         }
 
         Ok(PlankData::Str(String::from(s)))
-        // match s {
-        //     s if s.parse::<i32>().is_ok() => Ok(Self::Int32(s.parse::<i32>().unwrap())),
-        //     s if s.parse::<i64>().is_ok() => Ok(Self::Int64(s.parse::<i64>().unwrap())),
-        //     s if s.parse::<bool>().is_ok() => Ok(Self::Bool(s.parse::<bool>().unwrap())),
-        //     s if Self::parse_struct(s).is_ok() => Ok(Self::parse_struct(s).unwrap()),
-        //     s if s.parse::<String>().is_ok() => Ok(Self::Str(s.to_string())),
-        //     _ => Err(std::io::Error::new(
-        //         std::io::ErrorKind::InvalidData,
-        //         "unsupported type found",
-        //     )),
-        // }
     }
 }
 
@@ -323,6 +263,7 @@ impl fmt::Display for PlankType {
             Self::Int64 => write!(f, "Int64"),
             Self::Bool => write!(f, "Bool"),
             Self::Struct(_) => write!(f, "Struct"),
+            Self::List(_) => write!(f, "List"),
         }
     }
 }
@@ -335,6 +276,7 @@ impl Serialize for PlankType {
             Self::Int64 => 3,
             Self::Bool => 4,
             Self::Struct(_) => 5,
+            Self::List(_) => 6,
         };
         let mut v = id.to_le_bytes().to_vec();
 
@@ -343,6 +285,8 @@ impl Serialize for PlankType {
             for field in fields {
                 v.extend_from_slice(&field.to_bytes());
             }
+        } else if let Self::List(list_type) = self {
+            v.extend_from_slice(&list_type.to_bytes());
         }
 
         v
@@ -375,6 +319,10 @@ impl<'a> Deserialize<'a> for PlankType {
 
                 Ok(Self::Struct(v))
             }
+            6 => Ok(Self::List(Box::new(PlankType::from_bytes(
+                &bytes[1..],
+                &(),
+            )?))),
             _ => Err(std::io::Error::new(
                 std::io::ErrorKind::InvalidData,
                 format!("unknown type id {}", id),
@@ -459,11 +407,19 @@ impl Serialize for PlankData {
                 v.extend_from_slice(&[*b as u8]);
                 v
             }
-            st @ PlankData::Struct(s) => {
+            PlankData::Struct(s) => {
                 let mut v = Vec::new();
                 // v.extend_from_slice(&PlankType::from(st).to_bytes());
                 v.extend_from_slice(&(s.len() as u32).to_le_bytes());
                 for val in s {
+                    v.extend_from_slice(&val.to_bytes());
+                }
+                v
+            }
+            PlankData::List(l) => {
+                let mut v = Vec::new();
+                v.extend_from_slice(&(l.len() as u32).to_le_bytes());
+                for val in l {
                     v.extend_from_slice(&val.to_bytes());
                 }
                 v
@@ -473,10 +429,10 @@ impl Serialize for PlankData {
 }
 
 impl<'a> Deserialize<'a> for PlankData {
-    type Schema = PlankField;
+    type Schema = PlankType;
     fn from_bytes(bytes: &[u8], schema: &'a Self::Schema) -> std::io::Result<Self> {
-        let value_type = schema.field_type();
-        match value_type {
+        // let value_type = schema.field_type();
+        match schema {
             PlankType::Str => {
                 let size = u32::from_le_bytes(bytes[..4].try_into().map_err(|_| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, "expected u32")
@@ -516,11 +472,24 @@ impl<'a> Deserialize<'a> for PlankData {
                 let mut v = Vec::new();
                 let mut pos = 4;
                 for i in 0..size {
-                    let data = PlankData::from_bytes(&bytes[pos..], &fields[i])?;
+                    let data = PlankData::from_bytes(&bytes[pos..], &fields[i].field_type())?;
                     pos += data.to_bytes().len();
                     v.push(data);
                 }
                 Ok(PlankData::Struct(v))
+            }
+            PlankType::List(list_type) => {
+                let size = u32::from_le_bytes(bytes[..4].try_into().map_err(|_| {
+                    std::io::Error::new(std::io::ErrorKind::InvalidData, "expected struct size")
+                })?) as usize;
+                let mut v = Vec::new();
+                let mut pos = 4;
+                for _ in 0..size {
+                    let data = PlankData::from_bytes(&bytes[pos..], list_type.as_ref())?;
+                    pos += data.to_bytes().len();
+                    v.push(data);
+                }
+                Ok(PlankData::List(v))
             }
         }
     }

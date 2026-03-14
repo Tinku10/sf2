@@ -36,7 +36,7 @@ impl<'a> serde::Deserialize<'a> for Column {
         let mut pos = 0;
         let mut v = Vec::new();
         while pos < bytes.len() {
-            let item = PlankData::from_bytes(&bytes[pos..], schema)?;
+            let item = PlankData::from_bytes(&bytes[pos..], schema.field_type())?;
             let size = item.to_bytes().len();
             pos += size;
             v.push(item);
