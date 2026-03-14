@@ -11,24 +11,25 @@ Plank files are organized into two sections: **row groups**, and a **footer**.
 ### Layout
 
 ```
-[row group 1 size]
-    [column 1 size]
-        [data type id][data size]?[data]
-    [column 2 size]
+[row group-1 size]
+    [column-1 size]
+        [data size]?[data]
+    [column-2]
     ...
-    [column n size]
-[row group 2]
+    [column-n]
+[row group-2]
 ...
-[row group n]
+[row group-n]
 [schema size]
-    [field 1 name][data type id]
+    [field-1 name size][field-1 name][field-1 type]
+    [field-2]
     ...
-    [field n name][data type id]
+    [field-n]
 [row count size: 4 bytes][u32]
 [column count size: 4 bytes][u32]
 [row group count size: 4 bytes][u32]
 [offset size]
-    [u32]..[u32]
+    [row group-1 offset: 4 bytes]..[row group-n offset]
 [sha256 checksum]
 [footer offset: 4 bytes]
 ```
@@ -51,6 +52,16 @@ The above encodes two rows across four columns (`first_name`, `last_name`, `age`
 The footer contains complete file metadata and is located at the end of the file. The footer offset (a little-endian `u32`) is stored in the last 5 bytes of the file (4 bytes + newline), allowing readers to seek directly to the footer without scanning the file.
 
 ---
+
+### Data Types
+
+The following types are supported yet.
+
+- `Str`: Variable size text
+- `Int32`
+- `Int64`
+- `Bool`
+- `Struct`: Supports fields of any of the supported types
 
 ## Usage
 
