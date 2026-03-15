@@ -36,7 +36,7 @@ Plank files are organized into two sections: **row groups**, and a **footer**.
 
 ### Row Groups
 
-A row group is a fixed-size chunk of rows. Each line in a row group represents one column, with all values for that column in the current chunk listed comma-separated.
+A row group is a fixed-size chunk of rows. Each line in a row group represents one column.
 
 ```
 Jack,Emily,
@@ -49,7 +49,7 @@ The above encodes two rows across four columns (`first_name`, `last_name`, `age`
 
 ### Footer
 
-The footer contains complete file metadata and is located at the end of the file. The footer offset (a little-endian `u32`) is stored in the last 5 bytes of the file (4 bytes + newline), allowing readers to seek directly to the footer without scanning the file.
+The footer contains complete file metadata and is located at the end of the file. The footer offset (a little-endian `u32`) is stored in the last 4 bytes of the file, allowing readers to seek directly to the footer without scanning the file.
 
 ---
 
@@ -88,6 +88,13 @@ f.write_from_csv("/path/to/file.csv")?;
 ```
 
 ---
+
+## Possible Improvements
+
+- Entire row group is read into memory per call currently
+- Lists are not checked for homogeneity and cannot recognize the type in some scenarios
+- A column in a row group contains the full column irrespective of the byte size (maybe good, maybe not)
+- Row groups are divided into fixed number of collection of rows and cannot be configured (no metadata of this is kept in the footer)
 
 ## File Extension
 
