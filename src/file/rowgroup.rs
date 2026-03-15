@@ -1,7 +1,7 @@
 pub mod column;
 
 use crate::serde;
-use crate::types::PlankField;
+use crate::types::fields::PlankField;
 use column::Column;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom};
 

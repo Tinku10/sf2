@@ -1,5 +1,5 @@
 use crate::serde::{Deserialize, Serialize};
-use crate::types::{PlankField, PlankType};
+use crate::types::{fields::PlankField, types::PlankType};
 use sha2::{Digest, Sha256};
 use std::fmt::Write;
 use std::io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom};

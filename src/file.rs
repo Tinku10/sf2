@@ -4,7 +4,7 @@ pub(crate) mod rowgroup;
 pub mod writer;
 
 use footer::Footer;
-use crate::types::PlankField;
+use crate::types::fields::PlankField;
 
 #[derive(Debug)]
 pub struct PlankMeta {

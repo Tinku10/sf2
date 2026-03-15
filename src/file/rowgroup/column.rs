@@ -1,6 +1,6 @@
 use crate::serde;
 use crate::serde::{Deserialize, Serialize};
-use crate::types::{PlankData, PlankField, PlankType};
+use crate::types::{data::PlankData, fields::PlankField, types::PlankType};
 
 #[derive(Debug, Clone)]
 pub(crate) struct Column {

@@ -8,7 +8,7 @@ use crate::file::rowgroup::column::Column;
 use crate::file::rowgroup::RowGroup;
 use crate::file::PlankMeta;
 use crate::serde::Deserialize;
-use crate::types::{PlankData, PlankField, PlankType};
+use crate::types::{data::PlankData, fields::PlankField, types::PlankType};
 
 pub struct PlankReader {
     file: BufReader<File>,
