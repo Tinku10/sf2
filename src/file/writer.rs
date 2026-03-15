@@ -52,28 +52,31 @@ impl PlankWriter {
         let mut offsets = Vec::new();
         let mut curr_offset = 0;
 
-        let first_record = &reader.records().next().transpose()?;
+        let headers = reader.headers()?.clone();
+        let mut records = reader.records().peekable();
 
-        let schema: Vec<PlankField> = reader
-            .headers()?
-            .iter()
-            .enumerate()
-            .map(|(i, header)| {
-                let plank_type = first_record
-                    .as_ref()
-                    .and_then(|r| r.get(i))
-                    .map(PlankType::infer_type)
-                    .unwrap_or(PlankType::Str);
-                PlankField::new(header, plank_type)
-            })
-            .collect();
+        let schema = if let Some(Ok(first_record)) = records.peek() {
+            headers
+                .iter()
+                .enumerate()
+                .map(|(i, header)| {
+                    let plank_type = first_record
+                        .get(i)
+                        .map(PlankType::infer_type)
+                        .unwrap_or(PlankType::Str);
+                    PlankField::new(header, plank_type)
+                })
+                .collect()
+        } else {
+            Vec::new()
+        };
 
         let col_count = schema.len() as u32;
         let mut row_count = 0u32;
 
         let mut row_groups = Vec::new();
 
-        for chunk in &reader.records().chunks(footer::ROWGROUP_SIZE) {
+        for chunk in &records.chunks(footer::ROWGROUP_SIZE) {
             let mut row_group = vec![Vec::new(); schema.len()];
 
             for row in chunk {
