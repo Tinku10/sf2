@@ -89,6 +89,21 @@ f.write_from_csv("/path/to/file.csv")?;
 
 ---
 
+### Reading using the new Query API
+
+```rust
+
+
+let mut f = PlankReader::open("./data/100.plank").unwrap();
+let query = PlankQuery::new()
+    .filter(Cmp::Eq(QueryKey::RowGroup, PlankData::Int32(0)));
+
+let data = query::run_query(&mut f, &query).unwrap();
+for row in data {
+    println!("{:?}", row);
+}
+```
+
 ## Possible Improvements
 
 - Entire row group is read into memory per call currently
