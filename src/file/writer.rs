@@ -6,7 +6,6 @@ use std::path::Path;
 use crate::file::footer::{self, Footer};
 use crate::file::rowgroup::column::Column;
 use crate::file::rowgroup::RowGroup;
-use crate::file::PlankMeta;
 use crate::serde::Serialize;
 use crate::types::{data::PlankData, fields::PlankField, types::PlankType};
 
@@ -104,7 +103,7 @@ impl PlankWriter {
 
         // Add an extra offset pointing to the beginning of the footer
         // This will be used to know the byte size of any rowgroup N (offsets[N + 1] - offsets[N])
-        offsets.push(curr_offset);
+        // offsets.push(curr_offset);
 
         let footer = Footer::new(
             schema,

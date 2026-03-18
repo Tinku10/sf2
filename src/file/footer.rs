@@ -9,11 +9,11 @@ const PLANK_VERSION: &str = env!("CARGO_PKG_VERSION");
 
 #[derive(Debug)]
 pub(crate) struct Footer {
-    schema: Vec<PlankField>,
-    offsets: Vec<u32>,
-    row_count: u32,
-    col_count: u32,
-    row_group_count: u32,
+    pub(crate) schema: Vec<PlankField>,
+    pub(crate) offsets: Vec<u32>,
+    pub(crate) row_count: u32,
+    pub(crate) col_count: u32,
+    pub(crate) row_group_count: u32,
 }
 
 #[derive(Debug)]
@@ -52,27 +52,6 @@ impl Footer {
             col_count,
             row_group_count,
         }
-    }
-
-    pub fn schema(&self) -> &Vec<PlankField> {
-        &self.schema
-    }
-
-    pub fn offsets(&self) -> &Vec<u32> {
-        // TODO: Provide a better way to request limited offsets
-        &self.offsets
-    }
-
-    pub fn row_count(&self) -> u32 {
-        self.row_count
-    }
-
-    pub fn col_count(&self) -> u32 {
-        self.col_count
-    }
-
-    pub fn row_group_count(&self) -> u32 {
-        self.row_group_count
     }
 
     fn get_footer_layout() -> Vec<FooterFieldType> {
@@ -155,13 +134,13 @@ impl Serialize for Footer {
         for field in Self::get_footer_layout() {
             let bytes: Vec<u8> = match field {
                 FooterFieldType::Schema => {
-                    self.schema().iter().flat_map(|f| f.to_bytes()).collect()
+                    self.schema.iter().flat_map(|f| f.to_bytes()).collect()
                 }
-                FooterFieldType::RowCount => self.row_count().to_le_bytes().to_vec(),
-                FooterFieldType::ColCount => self.col_count().to_le_bytes().to_vec(),
-                FooterFieldType::RowGroupCount => self.row_group_count().to_le_bytes().to_vec(),
+                FooterFieldType::RowCount => self.row_count.to_le_bytes().to_vec(),
+                FooterFieldType::ColCount => self.col_count.to_le_bytes().to_vec(),
+                FooterFieldType::RowGroupCount => self.row_group_count.to_le_bytes().to_vec(),
                 FooterFieldType::Offsets => self
-                    .offsets()
+                    .offsets
                     .iter()
                     .flat_map(|f| f.to_le_bytes())
                     .collect(),

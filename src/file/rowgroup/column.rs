@@ -5,16 +5,18 @@ use crate::types::{data::PlankData, fields::PlankField, types::PlankType};
 #[derive(Debug, Clone)]
 pub(crate) struct Column {
     // id: u32,
-    records: Vec<PlankData>,
+    pub(crate) records: Vec<PlankData>,
+}
+
+impl Default for Column {
+    fn default() -> Self {
+        Column {records: Vec::new()}
+    }
 }
 
 impl Column {
     pub fn new(records: Vec<PlankData>) -> Self {
         Column { records }
-    }
-
-    pub fn records(&self) -> &Vec<PlankData> {
-        &self.records
     }
 }
 

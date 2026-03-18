@@ -6,13 +6,19 @@ use std::path::Path;
 use crate::file::footer::{self, Footer};
 use crate::file::rowgroup::column::Column;
 use crate::file::rowgroup::RowGroup;
-use crate::file::PlankMeta;
 use crate::serde::Deserialize;
 use crate::types::{data::PlankData, fields::PlankField, types::PlankType};
 
 pub struct PlankReader {
     file: BufReader<File>,
-    meta: PlankMeta,
+    footer: Footer,
+}
+
+#[derive(Debug)]
+pub struct RecordBatch {
+    schema: Vec<PlankField>,
+    columns: Vec<Column>,
+    row_count: usize,
 }
 
 pub struct RowGroupIterator<'a> {
@@ -55,56 +61,80 @@ impl PlankReader {
 
         let footer = Footer::from_bytes(&footer_buf, &())?;
 
-        let meta = PlankMeta { footer };
-
-        Ok(Self { file: br, meta })
+        Ok(Self { file: br, footer })
     }
 
-    pub fn get_schema(&self) -> &Vec<PlankField> {
-        &self.meta.footer.schema()
+    pub fn schema(&self) -> &[PlankField] {
+        &self.footer.schema
     }
 
-    pub fn meta(&self) -> &PlankMeta {
-        &self.meta
+    pub fn footer(&self) -> &Footer {
+        &self.footer
     }
 
-    // pub fn iter(self) -> RowGroupIterator<'_> {
-    //     let offsets = self.meta.footer.offsets().clone();
-    //     RowGroupIterator {
-    //         reader: self,
-    //         offsets,
-    //         curr_row_group: None,
-    //         index: 0,
-    //     }
-    // }
+    fn read_row_group_raw(&mut self, id: usize) -> std::io::Result<RowGroup> {
+        let footer = &self.footer;
+        let rg_offsets = &footer.offsets;
+
+        if id as u32 >= footer.row_group_count {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::NotFound,
+                "requested row group does not exist",
+            ));
+        }
+
+        let br = &mut self.file;
+
+        // Go to the beginning of the row group
+        br.seek(SeekFrom::Start(rg_offsets[id] as u64))?;
+
+        let mut buf = [0u8; 4];
+        br.read_exact(&mut buf)?;
+
+        let row_group_size = u32::from_le_bytes(buf);
+
+        let mut buf = vec![0u8; row_group_size as usize];
+        br.read_exact(&mut buf)?;
+
+        RowGroup::from_bytes(&buf, &self.footer.schema)
+    }
+
+    pub fn read_row_group(&mut self, id: usize) -> std::io::Result<RecordBatch> {
+        let rg = self.read_row_group_raw(id)?;
+
+        Ok(RecordBatch {
+            schema: self.footer.schema.clone(),
+            columns: rg.columns,
+            row_count: 0,
+        })
+    }
+
+    pub fn read_row_group_columns(
+        &mut self,
+        id: usize,
+        column_ids: &[usize],
+    ) -> std::io::Result<RecordBatch> {
+        let rg = self.read_row_group_raw(id)?;
+        let mut columns = rg.columns;
+
+        Ok(RecordBatch {
+            schema: self.footer.schema.clone(),
+            columns: column_ids
+                .iter()
+                .map(|&i| std::mem::replace(&mut columns[i], Column::default()))
+                .collect(),
+            row_count: 0,
+        })
+    }
 }
 
 impl<'a> Iterator for RowGroupIterator<'a> {
     type Item = std::io::Result<RowGroup>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        let br = &mut self.reader.file;
-        let meta = &self.reader.meta;
-
-        if self.index as u32 >= meta.footer.row_group_count() {
-            return None;
-        }
-
-        // Go to the beginning of the row group
-        br.seek(SeekFrom::Start(self.offsets[self.index] as u64));
-
-        let mut buf = [0u8; 4];
-        br.read_exact(&mut buf);
-
-        let row_group_size = u32::from_le_bytes(buf);
-
-        // Not good, I should instead return a iterator that can read the row group on demand
-        let mut buf = vec![0u8; row_group_size as usize];
-        br.read(&mut buf);
-
+        let rg = self.reader.read_row_group_raw(self.index).ok()?;
         self.index += 1;
-
-        Some(RowGroup::from_bytes(&buf, meta.schema()))
+        Some(Ok(rg))
     }
 }
 
@@ -114,13 +144,13 @@ impl Iterator for RowIterator {
     fn next(&mut self) -> Option<Self::Item> {
         let columns = self.row_group.as_ref()?.columns();
 
-        if self.row >= columns[0].records().len() {
+        if self.row >= columns[0].records.len() {
             return None;
         }
 
         let row: Vec<PlankData> = columns
             .iter()
-            .map(|col| col.records()[self.row].clone())
+            .map(|col| col.records[self.row].clone())
             .collect();
 
         self.row += 1;
@@ -133,7 +163,7 @@ impl<'a> IntoIterator for &'a mut PlankReader {
     type IntoIter = RowGroupIterator<'a>;
 
     fn into_iter(self) -> Self::IntoIter {
-        let offsets = self.meta.footer.offsets().clone();
+        let offsets = self.footer.offsets.clone();
         RowGroupIterator {
             reader: self,
             offsets,

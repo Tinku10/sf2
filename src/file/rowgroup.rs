@@ -8,8 +8,8 @@ use std::io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom};
 #[derive(Debug, Clone)]
 pub struct RowGroup {
     // id: u32,
-    id: u32,
-    columns: Vec<Column>,
+    pub(crate) id: u32,
+    pub(crate) columns: Vec<Column>,
 }
 
 impl RowGroup {
