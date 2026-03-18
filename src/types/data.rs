@@ -1,7 +1,7 @@
 use crate::serde::{Deserialize, Serialize};
+use crate::types::types::PlankType;
 use std::fmt;
 use std::str::FromStr;
-use crate::types::{types::PlankType};
 
 #[derive(Debug, Clone)]
 pub enum PlankData {
@@ -72,7 +72,7 @@ impl PlankData {
             PlankType::Int64 => Ok(PlankData::Int64(s.parse::<i64>().unwrap())),
             PlankType::Bool => Ok(PlankData::Bool(s.parse::<bool>().unwrap())),
             PlankType::Struct(_) => Self::parse_extended_value(s),
-            _ => Ok(PlankData::Str(String::from(s)))
+            _ => Ok(PlankData::Str(String::from(s))),
         }
     }
 }

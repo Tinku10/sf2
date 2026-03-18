@@ -92,16 +92,12 @@ f.write_from_csv("/path/to/file.csv")?;
 ### Reading using the new Query API
 
 ```rust
+let mut f = PlankReader::open("./data/file.plank").unwrap();
 
+// Read columns 0 and 1 from RowGroup 0
+let result = f.read_row_group_columns(0, &vec![0, 1]).unwrap();
 
-let mut f = PlankReader::open("./data/100.plank").unwrap();
-let query = PlankQuery::new()
-    .filter(Cmp::Eq(QueryKey::RowGroup, PlankData::Int32(0)));
-
-let data = query::run_query(&mut f, &query).unwrap();
-for row in data {
-    println!("{:?}", row);
-}
+println!("{:#?}, ", result);
 ```
 
 ## Possible Improvements
