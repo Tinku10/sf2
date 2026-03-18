@@ -1,4 +1,5 @@
 use itertools::Itertools;
+use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader, Read, Seek, SeekFrom, Write};
 use std::path::Path;
@@ -112,17 +113,34 @@ impl PlankReader {
     pub fn read_row_group_columns(
         &mut self,
         id: usize,
-        column_ids: &[usize],
+        column_names: &[&str],
     ) -> std::io::Result<RecordBatch> {
         let rg = self.read_row_group_raw(id)?;
         let mut columns = rg.columns;
 
+        // let mut column_map = HashMap::new();
+
+        let mut column_map = self
+            .schema()
+            .iter()
+            .enumerate()
+            .map(|(i, col)| (col.field_name().as_str(), i))
+            .collect::<HashMap<&str, usize>>();
+
         Ok(RecordBatch {
             schema: self.footer.schema.clone(),
-            columns: column_ids
+            columns: column_names
                 .iter()
-                .map(|&i| std::mem::replace(&mut columns[i], Column::default()))
-                .collect(),
+                .map(|&name| {
+                    let id = column_map.get(name).ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            format!("column {} not found", name),
+                        )
+                    })?;
+                    Ok(std::mem::replace(&mut columns[*id], Column::default()))
+                })
+                .collect::<std::io::Result<_>>()?,
             row_count: rg.row_count,
         })
     }
