@@ -71,7 +71,7 @@ impl PlankData {
             PlankType::Int32 => Ok(PlankData::Int32(s.parse::<i32>().unwrap())),
             PlankType::Int64 => Ok(PlankData::Int64(s.parse::<i64>().unwrap())),
             PlankType::Bool => Ok(PlankData::Bool(s.parse::<bool>().unwrap())),
-            PlankType::Struct(_) => Self::parse_extended_value(s),
+            PlankType::Struct(_) | PlankType::List(_) => Self::parse_extended_value(s),
             _ => Ok(PlankData::Str(String::from(s))),
         }
     }
