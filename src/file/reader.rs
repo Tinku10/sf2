@@ -120,22 +120,39 @@ impl PlankReader {
 
         // let mut column_map = HashMap::new();
 
-        let mut column_map = self
+        let mut column_by_name = self
             .schema()
             .iter()
             .enumerate()
             .map(|(i, col)| (col.field_name().as_str(), i))
             .collect::<HashMap<&str, usize>>();
 
+        let mut schema_by_name = self
+            .schema()
+            .iter()
+            .map(|col| (col.field_name().as_str(), col))
+            .collect::<HashMap<&str, &PlankField>>();
+
         Ok(RecordBatch {
-            schema: self.footer.schema.clone(),
+            schema: column_names
+                .iter()
+                .map(|&item| {
+                    let schema = schema_by_name.get(item).ok_or_else(|| {
+                        std::io::Error::new(
+                            std::io::ErrorKind::NotFound,
+                            format!("schema column {} not found", item),
+                        )
+                    })?.to_owned();
+                    Ok(schema.clone())
+                })
+                .collect::<std::io::Result<_>>()?,
             columns: column_names
                 .iter()
                 .map(|&name| {
-                    let id = column_map.get(name).ok_or_else(|| {
+                    let id = column_by_name.get(name).ok_or_else(|| {
                         std::io::Error::new(
                             std::io::ErrorKind::NotFound,
-                            format!("column {} not found", name),
+                            format!("data column {} not found", name),
                         )
                     })?;
                     Ok(std::mem::replace(&mut columns[*id], Column::default()))
