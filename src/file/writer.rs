@@ -90,11 +90,13 @@ impl PlankWriter {
                 row_count += 1;
             }
             let mut columns = Vec::new();
+            let mut row_group_row_count = 0;
             for rg in row_group {
+                row_group_row_count = rg.len();
                 columns.push(Column::new(rg));
             }
 
-            row_groups.push(RowGroup::new(row_group_id, columns, ROWGROUP_SIZE as u32));
+            row_groups.push(RowGroup::new(row_group_id, columns, row_group_row_count as u32));
             row_group_id += 1;
         }
 
