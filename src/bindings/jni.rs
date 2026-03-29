@@ -77,6 +77,61 @@ pub extern "system" fn Java_io_plank_PlankReader_readRowGroupColumnsNative(
     }
 }
 
+#[unsafe(no_mangle)]
+pub extern "system" fn Java_io_plank_PlankReader_getFooterNative(
+    mut env: JNIEnv,
+    _obj: JObject,
+    reader_ptr: jlong,
+    id: jint,
+    columns: JObjectArray,
+) -> jobject {
+    let reader = unsafe { &mut *(reader_ptr as *mut PlankReader) };
+    let footer = reader.footer();
+
+    let plank_meta_class = env.find_class("io/plank/PlankMeta").unwrap();
+    let obj = env.alloc_object(&plank_meta_class).unwrap();
+
+    env.set_field(&obj, "rowCount", "I", (footer.row_count as jint).into())
+        .unwrap();
+    env.set_field(&obj, "columnCount", "I", (footer.col_count as jint).into())
+        .unwrap();
+    env.set_field(
+        &obj,
+        "rowGroupCount",
+        "I",
+        (footer.row_group_count as jint).into(),
+    )
+    .unwrap();
+    env.set_field(&obj, "rowGroupCount", "I", (footer.row_group_count as jint).into())
+        .unwrap();
+
+    let map_class = env.find_class("java/util/LinkedHashMap").unwrap();
+    let schema_map = env.new_object(&map_class, "()V", &[]).unwrap();
+
+    for col in &footer.schema {
+        let field_name = env.new_string(col.field_name()).unwrap();
+        let field_type = env
+            .new_string(plank_type_to_string(col.field_type()))
+            .unwrap();
+        env.call_method(
+            &schema_map,
+            "put",
+            "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
+            &[(&field_name).into(), (&field_type).into()],
+        )
+        .unwrap();
+    }
+    env.set_field(
+        &obj,
+        "schema",
+        "Ljava/util/LinkedHashMap;",
+        (&schema_map).into(),
+    )
+    .unwrap();
+
+    obj.into_raw()
+}
+
 fn plank_type_to_jclass<'local>(
     env: &mut JNIEnv<'local>,
     plank_type: &PlankType,
@@ -120,20 +175,21 @@ fn plank_data_to_jobject<'local>(
     schema: &PlankType,
 ) -> JObject<'local> {
     match (schema, data) {
-        (PlankType::Str, PlankData::Str(s)) => {
-            env.new_string(s).unwrap().into()
-        }
+        (PlankType::Str, PlankData::Str(s)) => env.new_string(s).unwrap().into(),
         (PlankType::Int32, PlankData::Int32(n)) => {
             let class = env.find_class("java/lang/Integer").unwrap();
-            env.new_object(class, "(I)V", &[(*n as jint).into()]).unwrap()
+            env.new_object(class, "(I)V", &[(*n as jint).into()])
+                .unwrap()
         }
         (PlankType::Int64, PlankData::Int64(n)) => {
             let class = env.find_class("java/lang/Long").unwrap();
-            env.new_object(class, "(J)V", &[(*n as jlong).into()]).unwrap()
+            env.new_object(class, "(J)V", &[(*n as jlong).into()])
+                .unwrap()
         }
         (PlankType::Bool, PlankData::Bool(b)) => {
             let class = env.find_class("java/lang/Boolean").unwrap();
-            env.new_object(class, "(Z)V", &[(*b as jboolean).into()]).unwrap()
+            env.new_object(class, "(Z)V", &[(*b as jboolean).into()])
+                .unwrap()
         }
         (PlankType::Struct(fields), PlankData::Struct(values)) => {
             let class = env.find_class("java/util/HashMap").unwrap();
@@ -146,7 +202,8 @@ fn plank_data_to_jobject<'local>(
                     "put",
                     "(Ljava/lang/Object;Ljava/lang/Object;)Ljava/lang/Object;",
                     &[(&key).into(), (&val).into()],
-                ).unwrap();
+                )
+                .unwrap();
             }
             map
         }
@@ -155,11 +212,12 @@ fn plank_data_to_jobject<'local>(
             let list = env.new_object(class, "()V", &[]).unwrap();
             for item in items {
                 let val = plank_data_to_jobject(env, item, item_type);
-                env.call_method(&list, "add", "(Ljava/lang/Object;)Z", &[(&val).into()]).unwrap();
+                env.call_method(&list, "add", "(Ljava/lang/Object;)Z", &[(&val).into()])
+                    .unwrap();
             }
             list
         }
-        _ => JObject::null()
+        _ => JObject::null(),
     }
 }
 
@@ -211,8 +269,13 @@ fn record_batch_to_jobject(env: &mut JNIEnv, batch: RecordBatch) -> jobject {
         )
         .unwrap();
     }
-    env.set_field(&obj, "schema", "Ljava/util/LinkedHashMap;", (&schema_map).into())
-        .unwrap();
+    env.set_field(
+        &obj,
+        "schema",
+        "Ljava/util/LinkedHashMap;",
+        (&schema_map).into(),
+    )
+    .unwrap();
 
     obj.into_raw()
 }
