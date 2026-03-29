@@ -7,7 +7,7 @@ use crate::serde::Serialize;
 use crate::types::{data::PlankData, fields::PlankField, types::PlankType};
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_PlankReader_openNative(
+pub extern "system" fn Java_io_plank_PlankReader_openNative(
     mut env: JNIEnv,
     _obj: JObject,
     path: JString,
@@ -32,7 +32,7 @@ pub extern "system" fn Java_PlankReader_openNative(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_PlankReader_readRowGroupNative(
+pub extern "system" fn Java_io_plank_PlankReader_readRowGroupNative(
     mut env: JNIEnv,
     _obj: JObject,
     reader_ptr: jlong,
@@ -49,9 +49,9 @@ pub extern "system" fn Java_PlankReader_readRowGroupNative(
 }
 
 #[unsafe(no_mangle)]
-pub extern "system" fn Java_PlankReader_readRowGroupColumnsNative(
+pub extern "system" fn Java_io_plank_PlankReader_readRowGroupColumnsNative(
     mut env: JNIEnv,
-    _class: JClass,
+    _obj: JObject,
     reader_ptr: jlong,
     id: jint,
     columns: JObjectArray,
@@ -164,7 +164,7 @@ fn plank_data_to_jobject<'local>(
 }
 
 fn record_batch_to_jobject(env: &mut JNIEnv, batch: RecordBatch) -> jobject {
-    let class = env.find_class("RecordBatch").unwrap();
+    let class = env.find_class("io/plank/RecordBatch").unwrap();
     let obj = env.alloc_object(&class).unwrap();
     env.set_field(&obj, "rowCount", "I", (batch.row_count as jint).into())
         .unwrap();
