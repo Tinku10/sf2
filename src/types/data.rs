@@ -75,6 +75,29 @@ impl PlankData {
             _ => Ok(PlankData::Str(String::from(s))),
         }
     }
+
+    pub fn get_struct_field(&self, schema: &PlankType, field_name: &str) -> Option<&Self> {
+        // TODO: field_name can be made to get a dot(.) separated names
+        match (self, schema) {
+            (Self::Struct(fields), PlankType::Struct(types)) => {
+                for (k, v) in types.iter().zip(fields) {
+                    if k.field_name() == field_name {
+                        return Some(v);
+                    }
+                }
+                None
+            }
+            _ => None,
+        }
+    }
+
+    pub fn get(&self, index: usize) -> Option<&Self> {
+        match self {
+            PlankData::Struct(fields) => fields.get(index),
+            PlankData::List(items) => items.get(index),
+            _ => None,
+        }
+    }
 }
 
 impl fmt::Display for PlankData {
@@ -189,13 +212,14 @@ impl<'a> Deserialize<'a> for PlankData {
                 })?);
                 Ok(PlankData::Int64(n))
             }
-            PlankType::Bool => {
-                match bytes[0] {
-                    0 => Ok(PlankData::Bool(false)),
-                    1 => Ok(PlankData::Bool(true)),
-                    _ => Err(std::io::Error::new(std::io::ErrorKind::InvalidData, "expected bool"))
-                }
-            }
+            PlankType::Bool => match bytes[0] {
+                0 => Ok(PlankData::Bool(false)),
+                1 => Ok(PlankData::Bool(true)),
+                _ => Err(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "expected bool",
+                )),
+            },
             PlankType::Struct(fields) => {
                 let size = u32::from_le_bytes(bytes[..4].try_into().map_err(|_| {
                     std::io::Error::new(std::io::ErrorKind::InvalidData, "expected struct size")
