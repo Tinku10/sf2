@@ -82,8 +82,6 @@ pub extern "system" fn Java_io_plank_PlankReader_getFooterNative(
     mut env: JNIEnv,
     _obj: JObject,
     reader_ptr: jlong,
-    id: jint,
-    columns: JObjectArray,
 ) -> jobject {
     let reader = unsafe { &mut *(reader_ptr as *mut PlankReader) };
     let footer = reader.footer();
@@ -102,8 +100,13 @@ pub extern "system" fn Java_io_plank_PlankReader_getFooterNative(
         (footer.row_group_count as jint).into(),
     )
     .unwrap();
-    env.set_field(&obj, "rowGroupCount", "I", (footer.row_group_count as jint).into())
-        .unwrap();
+    env.set_field(
+        &obj,
+        "rowGroupCount",
+        "I",
+        (footer.row_group_count as jint).into(),
+    )
+    .unwrap();
 
     let map_class = env.find_class("java/util/LinkedHashMap").unwrap();
     let schema_map = env.new_object(&map_class, "()V", &[]).unwrap();
