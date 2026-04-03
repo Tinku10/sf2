@@ -71,6 +71,8 @@ The following types are supported yet.
 ### Reading all rows
 
 ```rust
+use plank::PlankReader;
+
 let mut f = PlankReader::open("/path/to/file.plank")?;
 
 for rg in &mut f {
@@ -85,6 +87,8 @@ for rg in &mut f {
 ### Converting a CSV
 
 ```rust
+use plank::PlankWriter;
+
 let mut f = PlankWriter::new("/path/to/file.plank")?;
 f.write_from_csv("/path/to/file.csv")?;
 ```
@@ -92,12 +96,26 @@ f.write_from_csv("/path/to/file.csv")?;
 ### Reading specific row groups with selected columns
 
 ```rust
+use plank::PlankWriter;
+
 let mut f = PlankReader::open("./data/file.plank").unwrap();
 
 // Read columns 0 and 1 from RowGroup 0
 let result = f.read_row_group_columns(0, &vec!["name", "age"]).unwrap();
 
 println!("{:#?}, ", result);
+```
+
+### Using the Java Bindings from Java
+
+```java
+import io.plank.*;
+
+PlankReader reader = new PlankReader("/path/to/file.plank");
+
+RecordBatch rb = reader.readRowGroupColumns(0, new String[]{"name", "age"});
+
+System.out.println(rb);
 ```
 
 ---
