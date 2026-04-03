@@ -132,7 +132,7 @@ impl fmt::Display for PlankData {
 }
 
 impl Serialize for PlankData {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> std::io::Result<Vec<u8>> {
         match self {
             PlankData::Str(s) => {
                 let mut v = Vec::new();
@@ -140,42 +140,42 @@ impl Serialize for PlankData {
                 // v.extend_from_slice(&PlankType::to_bytes(&PlankType::Str));
                 v.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
                 v.extend_from_slice(bytes);
-                v
+                Ok(v)
             }
             PlankData::Int32(n) => {
                 let mut v = Vec::new();
                 // v.extend_from_slice(&PlankType::to_bytes(&PlankType::Int32));
                 v.extend_from_slice(&n.to_le_bytes());
-                v
+                Ok(v)
             }
             PlankData::Int64(n) => {
                 let mut v = Vec::new();
                 // v.extend_from_slice(&PlankType::to_bytes(&PlankType::Int64));
                 v.extend_from_slice(&n.to_le_bytes());
-                v
+                Ok(v)
             }
             PlankData::Bool(b) => {
                 let mut v = Vec::new();
                 // v.extend_from_slice(&PlankType::to_bytes(&PlankType::Bool));
                 v.extend_from_slice(&[*b as u8]);
-                v
+                Ok(v)
             }
             PlankData::Struct(s) => {
                 let mut v = Vec::new();
                 // v.extend_from_slice(&PlankType::from(st).to_bytes());
                 v.extend_from_slice(&(s.len() as u32).to_le_bytes());
                 for val in s {
-                    v.extend_from_slice(&val.to_bytes());
+                    v.extend_from_slice(&val.to_bytes()?);
                 }
-                v
+                Ok(v)
             }
             PlankData::List(l) => {
                 let mut v = Vec::new();
                 v.extend_from_slice(&(l.len() as u32).to_le_bytes());
                 for val in l {
-                    v.extend_from_slice(&val.to_bytes());
+                    v.extend_from_slice(&val.to_bytes()?);
                 }
-                v
+                Ok(v)
             }
         }
     }
@@ -228,7 +228,7 @@ impl<'a> Deserialize<'a> for PlankData {
                 let mut pos = 4;
                 for i in 0..size {
                     let data = PlankData::from_bytes(&bytes[pos..], &fields[i].field_type())?;
-                    pos += data.to_bytes().len();
+                    pos += data.to_bytes()?.len();
                     v.push(data);
                 }
                 Ok(PlankData::Struct(v))
@@ -241,7 +241,7 @@ impl<'a> Deserialize<'a> for PlankData {
                 let mut pos = 4;
                 for _ in 0..size {
                     let data = PlankData::from_bytes(&bytes[pos..], list_type.as_ref())?;
-                    pos += data.to_bytes().len();
+                    pos += data.to_bytes()?.len();
                     v.push(data);
                 }
                 Ok(PlankData::List(v))

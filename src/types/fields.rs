@@ -46,7 +46,7 @@ impl PlankField {
 }
 
 impl Serialize for PlankField {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> std::io::Result<Vec<u8>> {
         // Format: field_size field_name type_size type_name
         let mut v = Vec::new();
         let name_bytes = self.name.as_bytes();
@@ -55,9 +55,9 @@ impl Serialize for PlankField {
         v.extend_from_slice(name_bytes);
         // Type ID will always be a u32
         // v.extend_from_slice(4u32.to_le_bytes());
-        v.extend_from_slice(&self.field_type.to_bytes());
+        v.extend_from_slice(&self.field_type.to_bytes()?);
 
-        v
+        Ok(v)
     }
 }
 

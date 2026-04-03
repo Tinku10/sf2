@@ -124,7 +124,7 @@ impl Footer {
 }
 
 impl Serialize for Footer {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> std::io::Result<Vec<u8>> {
         let mut s = Vec::new();
 
         // s.extend_from_slice(format!("!PLANK_VERSION={}", PLANK_VERSION).as_bytes());
@@ -133,7 +133,7 @@ impl Serialize for Footer {
         for field in Self::get_footer_layout() {
             let bytes: Vec<u8> = match field {
                 FooterFieldType::Schema => {
-                    self.schema.iter().flat_map(|f| f.to_bytes()).collect()
+                    self.schema.iter().flat_map(|f| f.to_bytes()).flatten().collect()
                 }
                 FooterFieldType::RowCount => self.row_count.to_le_bytes().to_vec(),
                 FooterFieldType::ColCount => self.col_count.to_le_bytes().to_vec(),
@@ -152,7 +152,7 @@ impl Serialize for Footer {
         let checksum = Sha256::digest(&s);
         s.extend_from_slice(&checksum.to_vec());
 
-        s
+        Ok(s)
     }
 }
 

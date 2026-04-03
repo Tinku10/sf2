@@ -107,7 +107,7 @@ impl fmt::Display for PlankType {
 }
 
 impl Serialize for PlankType {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> std::io::Result<Vec<u8>> {
         let id: u8 = match self {
             Self::Str => 1,
             Self::Int32 => 2,
@@ -121,13 +121,13 @@ impl Serialize for PlankType {
         if let Self::Struct(fields) = self {
             v.extend_from_slice(&(fields.len() as u32).to_le_bytes());
             for field in fields {
-                v.extend_from_slice(&field.to_bytes());
+                v.extend_from_slice(&field.to_bytes()?);
             }
         } else if let Self::List(list_type) = self {
-            v.extend_from_slice(&list_type.to_bytes());
+            v.extend_from_slice(&list_type.to_bytes()?);
         }
 
-        v
+        Ok(v)
     }
 }
 

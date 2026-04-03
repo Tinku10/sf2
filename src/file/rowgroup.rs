@@ -19,18 +19,18 @@ impl RowGroup {
 }
 
 impl serde::Serialize for RowGroup {
-    fn to_bytes(&self) -> Vec<u8> {
+    fn to_bytes(&self) -> std::io::Result<Vec<u8>> {
         let mut v = Vec::new();
         v.extend_from_slice(&self.id.to_le_bytes());
         v.extend_from_slice(&self.row_count.to_le_bytes());
 
         for col in &self.columns {
-            let column_bytes = col.to_bytes();
+            let column_bytes = col.to_bytes()?;
             v.extend_from_slice(&(column_bytes.len() as u32).to_le_bytes());
             v.extend_from_slice(&column_bytes);
         }
 
-        v
+        Ok(v)
     }
 }
 

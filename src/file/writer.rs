@@ -22,7 +22,7 @@ impl PlankWriter {
     }
 
     fn write_rowgroup(&mut self, rg: &RowGroup) -> std::io::Result<u32> {
-        let rg_bytes = rg.to_bytes();
+        let rg_bytes = rg.to_bytes()?;
         self.file
             .write_all(&(rg_bytes.len() as u32).to_le_bytes())?;
         self.file.write_all(&rg_bytes);
@@ -41,7 +41,7 @@ impl PlankWriter {
                 "offset does not fit into u32",
             )
         })?;
-        self.file.write_all(&footer.to_bytes())?;
+        self.file.write_all(&footer.to_bytes()?)?;
         self.file.write_all(&before.to_le_bytes())?;
         Ok(())
     }
