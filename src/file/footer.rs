@@ -6,7 +6,7 @@ use std::io::{BufRead, BufReader, Cursor, Read, Seek, SeekFrom};
 
 const PLANK_VERSION: &str = env!("CARGO_PKG_VERSION");
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub(crate) struct Footer {
     pub(crate) schema: Vec<PlankField>,
     pub(crate) offsets: Vec<u32>,
@@ -22,18 +22,6 @@ enum FooterFieldType {
     RowCount,
     ColCount,
     RowGroupCount,
-}
-
-impl Default for Footer {
-    fn default() -> Self {
-        Footer {
-            schema: Vec::new(),
-            offsets: Vec::new(),
-            row_count: 0,
-            col_count: 0,
-            row_group_count: 0,
-        }
-    }
 }
 
 impl Footer {
@@ -132,17 +120,18 @@ impl Serialize for Footer {
 
         for field in Self::get_footer_layout() {
             let bytes: Vec<u8> = match field {
-                FooterFieldType::Schema => {
-                    self.schema.iter().flat_map(|f| f.to_bytes()).flatten().collect()
-                }
+                FooterFieldType::Schema => self
+                    .schema
+                    .iter()
+                    .flat_map(|f| f.to_bytes())
+                    .flatten()
+                    .collect(),
                 FooterFieldType::RowCount => self.row_count.to_le_bytes().to_vec(),
                 FooterFieldType::ColCount => self.col_count.to_le_bytes().to_vec(),
                 FooterFieldType::RowGroupCount => self.row_group_count.to_le_bytes().to_vec(),
-                FooterFieldType::Offsets => self
-                    .offsets
-                    .iter()
-                    .flat_map(|f| f.to_le_bytes())
-                    .collect(),
+                FooterFieldType::Offsets => {
+                    self.offsets.iter().flat_map(|f| f.to_le_bytes()).collect()
+                }
             };
 
             s.extend_from_slice(&(bytes.len() as u32).to_le_bytes());
@@ -200,5 +189,34 @@ impl<'a> Deserialize<'a> for Footer {
         }
 
         Ok(footer)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_roundtrip_footer() {
+        let footer = Footer::new(
+            vec![
+                PlankField::new("col1", PlankType::Int32),
+                PlankField::new("col2", PlankType::Str),
+            ],
+            vec![0, 3, 6, 9],
+            10,
+            2,
+            5,
+        );
+
+        let bytes = footer.to_bytes().unwrap();
+        let deserialized = Footer::from_bytes(&bytes, &()).unwrap();
+
+        assert_eq!(footer.row_count, deserialized.row_count);
+        assert_eq!(footer.col_count, deserialized.col_count);
+        assert_eq!(footer.row_group_count, deserialized.row_group_count);
+        assert_eq!(footer.offsets, deserialized.offsets);
+
+        assert_eq!(bytes, deserialized.to_bytes().unwrap());
     }
 }

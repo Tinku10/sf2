@@ -3,7 +3,7 @@ use crate::types::types::PlankType;
 use std::fmt;
 use std::str::FromStr;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlankData {
     Str(String),
     Int32(i32),
@@ -247,5 +247,53 @@ impl<'a> Deserialize<'a> for PlankData {
                 Ok(PlankData::List(v))
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::types::fields::PlankField;
+
+    #[test]
+    fn test_roundtrip_plankdata_int() {
+        let data = PlankData::Int32(1);
+
+        let serialized = data.to_bytes().unwrap();
+        let deserialized = PlankData::from_bytes(&serialized, &PlankType::Int32).unwrap();
+
+        assert_eq!(data, deserialized);
+    }
+
+    #[test]
+    fn test_roundtrip_plankdata_struct() {
+        let data = PlankData::Struct(vec![
+            PlankData::Int32(1),
+            PlankData::Str("hello".to_string()),
+        ]);
+
+        let serialized = data.to_bytes().unwrap();
+        let deserialized = PlankData::from_bytes(
+            &serialized,
+            &PlankType::Struct(vec![
+                PlankField::new("col1", PlankType::Int32),
+                PlankField::new("col2", PlankType::Str),
+            ]),
+        )
+        .unwrap();
+
+        assert_eq!(data, deserialized);
+    }
+
+    #[test]
+    fn test_roundtrip_plankdata_list() {
+        let data = PlankData::List(vec![PlankData::Int32(1), PlankData::Int32(2)]);
+
+        let serialized = data.to_bytes().unwrap();
+        let deserialized =
+            PlankData::from_bytes(&serialized, &PlankType::List(Box::new(PlankType::Int32)))
+                .unwrap();
+
+        assert_eq!(data, deserialized);
     }
 }

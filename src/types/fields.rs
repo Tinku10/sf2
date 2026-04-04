@@ -1,9 +1,9 @@
 use crate::serde::{Deserialize, Serialize};
+use crate::types::types::PlankType;
 use std::fmt;
 use std::str::FromStr;
-use crate::types::types::PlankType;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct PlankField {
     name: String,
     field_type: PlankType,
@@ -89,5 +89,21 @@ impl<'a> Deserialize<'a> for PlankField {
             name: field_name,
             field_type,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_roundtrip_plankfield() {
+        let field = PlankField::new("name", PlankType::Str);
+
+        let serialized = field.to_bytes().unwrap();
+        let deserialized = PlankField::from_bytes(&serialized, &()).unwrap();
+
+        assert_eq!(deserialized.name, field.name);
+        assert_eq!(deserialized.field_type, field.field_type);
     }
 }

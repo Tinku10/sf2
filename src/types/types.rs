@@ -1,9 +1,9 @@
 use crate::serde::{Deserialize, Serialize};
+use crate::types::fields::PlankField;
 use std::fmt;
 use std::str::FromStr;
-use crate::types::fields::PlankField;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum PlankType {
     Str,
     Int32,
@@ -166,5 +166,34 @@ impl<'a> Deserialize<'a> for PlankType {
                 format!("unknown type id {}", id),
             )),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::serde::{Deserialize, Serialize};
+
+    #[test]
+    fn test_roundtrip_planktype_int() {
+        let int_type = PlankType::Int32;
+
+        let serialized = int_type.to_bytes().unwrap();
+        let deserialized = PlankType::from_bytes(&serialized, &()).unwrap();
+
+        assert_eq!(deserialized, int_type);
+    }
+
+    #[test]
+    fn test_roundtrip_planktype_struct() {
+        let struct_type = PlankType::Struct(vec![
+            PlankField::new("col1", PlankType::Int32),
+            PlankField::new("col2", PlankType::Str),
+        ]);
+
+        let serialized = struct_type.to_bytes().unwrap();
+        let deserialized = PlankType::from_bytes(&serialized, &()).unwrap();
+
+        assert_eq!(deserialized, struct_type);
     }
 }

@@ -14,7 +14,11 @@ pub struct RowGroup {
 
 impl RowGroup {
     pub fn new(id: u32, columns: Vec<Column>, row_count: u32) -> Self {
-        RowGroup { id, columns, row_count }
+        RowGroup {
+            id,
+            columns,
+            row_count,
+        }
     }
 }
 
@@ -40,13 +44,15 @@ impl<'a> serde::Deserialize<'a> for RowGroup {
         let mut br = BufReader::new(Cursor::new(bytes));
         let mut columns = Vec::new();
 
-        let id = u32::from_le_bytes(bytes[..4].try_into().map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "expected u32")
-        })?);
+        let id =
+            u32::from_le_bytes(bytes[..4].try_into().map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "expected u32")
+            })?);
 
-        let row_count = u32::from_le_bytes(bytes[4..8].try_into().map_err(|_| {
-            std::io::Error::new(std::io::ErrorKind::InvalidData, "expected u32")
-        })?);
+        let row_count =
+            u32::from_le_bytes(bytes[4..8].try_into().map_err(|_| {
+                std::io::Error::new(std::io::ErrorKind::InvalidData, "expected u32")
+            })?);
 
         let mut pos = 8;
         let mut schema_id = 0;
@@ -67,6 +73,49 @@ impl<'a> serde::Deserialize<'a> for RowGroup {
             pos += size;
         }
 
-        Ok(RowGroup { id, columns, row_count })
+        Ok(RowGroup {
+            id,
+            columns,
+            row_count,
+        })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::serde::{Deserialize, Serialize};
+    use crate::types::{data::PlankData, types::PlankType};
+
+    #[test]
+    fn test_roundtrip_rowgroup() {
+        let rowgroup = RowGroup::new(
+            0,
+            vec![
+                Column::new(vec![PlankData::Int32(1), PlankData::Int32(2)]),
+                Column::new(vec![
+                    PlankData::Str("a".to_string()),
+                    PlankData::Str("b".to_string()),
+                ]),
+            ],
+            2,
+        );
+
+        let serialized = rowgroup.to_bytes().unwrap();
+        let deserialized = RowGroup::from_bytes(
+            &serialized,
+            &vec![
+                PlankField::new("col1", PlankType::Int32),
+                PlankField::new("col2", PlankType::Str),
+            ],
+        )
+        .unwrap();
+
+        assert_eq!(rowgroup.row_count, deserialized.row_count);
+        assert_eq!(rowgroup.id, deserialized.id);
+        assert_eq!(
+            rowgroup.columns[0].records[0],
+            deserialized.columns[0].records[0]
+        );
     }
 }
