@@ -33,6 +33,7 @@ impl PlankData {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         match s {
             serde_json::Value::Number(n) => {
+                // TODO: Add i32 support
                 if let Some(n) = n.as_i64() {
                     Ok(PlankData::Int64(n))
                 } else {
@@ -253,7 +254,7 @@ impl<'a> Deserialize<'a> for PlankData {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::types::fields::PlankField;
+    use crate::types::{data::PlankData, fields::PlankField};
 
     #[test]
     fn test_roundtrip_plankdata_int() {
@@ -295,5 +296,56 @@ mod tests {
                 .unwrap();
 
         assert_eq!(data, deserialized);
+    }
+
+    #[test]
+    fn test_parse_value_into_plankdata_int() {
+        assert_eq!(PlankData::parse_value("1"), PlankData::Int32(1));
+        assert_eq!(PlankData::parse_value("20"), PlankData::Int32(20));
+        assert_eq!(
+            PlankData::parse_value("20000000000"),
+            PlankData::Int64(20000000000)
+        );
+    }
+
+    #[test]
+    fn test_parse_value_into_plankdata_bool() {
+        assert_eq!(PlankData::parse_value("true"), PlankData::Bool(true));
+        assert_eq!(PlankData::parse_value("false"), PlankData::Bool(false));
+    }
+
+    #[test]
+    fn test_parse_value_into_plankdata_struct() {
+        assert_eq!(
+            PlankData::parse_value(r#"{"name": "me", "age": 10}"#),
+            PlankData::Struct(vec![PlankData::Str("me".to_string()), PlankData::Int64(10)])
+        );
+    }
+
+    #[test]
+    fn test_parse_value_into_plankdata_list() {
+        assert_eq!(
+            PlankData::parse_value(r"[1, 2, 3, 4]"),
+            PlankData::List(vec![
+                PlankData::Int64(1),
+                PlankData::Int64(2),
+                PlankData::Int64(3),
+                PlankData::Int64(4)
+            ])
+        );
+    }
+
+    #[test]
+    fn test_get_struct_field() {
+        let s = PlankData::Struct(vec![PlankData::Str("me".to_string()), PlankData::Int32(10)]);
+
+        assert_eq!(s.get(0), Some(&PlankData::Str("me".to_string())));
+    }
+
+    #[test]
+    fn test_get_list_field() {
+        let s = PlankData::List(vec![PlankData::Int32(20), PlankData::Int32(10)]);
+
+        assert_eq!(s.get(0), Some(&PlankData::Int32(20)));
     }
 }

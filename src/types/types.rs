@@ -196,4 +196,30 @@ mod tests {
 
         assert_eq!(deserialized, struct_type);
     }
+
+    #[test]
+    fn test_encoded_size_planktype_struct() {
+        let t = PlankType::Struct(vec![
+            PlankField::new("name", PlankType::Str),
+            PlankField::new("age", PlankType::Int32),
+        ]);
+
+        assert_eq!(
+            t.encoded_size(),
+            1 + 4
+                + PlankField::encoded_size(&PlankField::new("name", PlankType::Str))
+                + PlankField::encoded_size(&PlankField::new("age", PlankType::Int32))
+        );
+    }
+
+    #[test]
+    fn test_infer_value_into_planktype() {
+        assert_eq!(
+            PlankType::infer_type(r#"{"name": "me", "age": 10}"#),
+            PlankType::Struct(vec![
+                PlankField::new("name", PlankType::Str),
+                PlankField::new("age", PlankType::Int64)
+            ])
+        )
+    }
 }

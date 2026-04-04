@@ -106,4 +106,28 @@ mod tests {
         assert_eq!(deserialized.name, field.name);
         assert_eq!(deserialized.field_type, field.field_type);
     }
+
+    #[test]
+    fn test_encoded_size_planfield() {
+        let field = PlankField::new("name", PlankType::Str);
+
+        assert_eq!(
+            field.encoded_size(),
+            4 + 4 + PlankType::encoded_size(&PlankType::Str)
+        );
+    }
+
+    #[test]
+    fn test_infer_key_value_into_plankfield() {
+        assert_eq!(
+            PlankField::from_value("person", r#"{"name": "me", "age": 10}"#),
+            PlankField::new(
+                "person",
+                PlankType::Struct(vec![
+                    PlankField::new("name", PlankType::Str),
+                    PlankField::new("age", PlankType::Int64)
+                ])
+            )
+        )
+    }
 }

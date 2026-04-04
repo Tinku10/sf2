@@ -11,7 +11,7 @@ crate-type = ["cdylib"]
 csv = "1.4.0"
 itertools = "0.12"
 sha2 = "0.10"
-serde_json = "1.0"
+serde_json = { version = "1.0", features = ["preserve_order"] }
 jni = { version = "0.21", optional = false }
 flate2 = "1.0"
 
