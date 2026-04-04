@@ -1,4 +1,4 @@
-# Plank
+# Plank ![GitHub Actions Workflow Status](https://img.shields.io/github/actions/workflow/status/Tinku10/plank/rust.yml)
 
 A simple and efficient binary file format for structured tabular data. Plank stores data in a columnar layout for fast metadata access.
 
