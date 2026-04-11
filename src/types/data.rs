@@ -35,6 +35,9 @@ impl PlankData {
             serde_json::Value::Number(n) => {
                 // TODO: Add i32 support
                 if let Some(n) = n.as_i64() {
+                    if let Ok(n) = i32::try_from(n) {
+                        return Ok(PlankData::Int32(n));
+                    }
                     Ok(PlankData::Int64(n))
                 } else {
                     Err(std::io::Error::new(
