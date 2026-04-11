@@ -48,7 +48,10 @@ impl PlankType {
             .map_err(|e| std::io::Error::new(std::io::ErrorKind::InvalidData, e))?;
         match s {
             serde_json::Value::Number(n) => {
-                if let Some(_) = n.as_i64() {
+                if let Some(n) = n.as_i64() {
+                    if let Ok(_) = i32::try_from(n) {
+                        return Ok(PlankType::Int32);
+                    }
                     Ok(PlankType::Int64)
                 } else {
                     Err(std::io::Error::new(
@@ -218,7 +221,7 @@ mod tests {
             PlankType::infer_type(r#"{"name": "me", "age": 10}"#),
             PlankType::Struct(vec![
                 PlankField::new("name", PlankType::Str),
-                PlankField::new("age", PlankType::Int64)
+                PlankField::new("age", PlankType::Int32)
             ])
         )
     }
