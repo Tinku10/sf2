@@ -125,7 +125,7 @@ mod tests {
                 "person",
                 PlankType::Struct(vec![
                     PlankField::new("name", PlankType::Str),
-                    PlankField::new("age", PlankType::Int64)
+                    PlankField::new("age", PlankType::Int32)
                 ])
             )
         )

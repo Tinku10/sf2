@@ -321,7 +321,7 @@ mod tests {
     fn test_parse_value_into_plankdata_struct() {
         assert_eq!(
             PlankData::parse_value(r#"{"name": "me", "age": 10}"#),
-            PlankData::Struct(vec![PlankData::Str("me".to_string()), PlankData::Int64(10)])
+            PlankData::Struct(vec![PlankData::Str("me".to_string()), PlankData::Int32(10)])
         );
     }
 
@@ -330,10 +330,10 @@ mod tests {
         assert_eq!(
             PlankData::parse_value(r"[1, 2, 3, 4]"),
             PlankData::List(vec![
-                PlankData::Int64(1),
-                PlankData::Int64(2),
-                PlankData::Int64(3),
-                PlankData::Int64(4)
+                PlankData::Int32(1),
+                PlankData::Int32(2),
+                PlankData::Int32(3),
+                PlankData::Int32(4)
             ])
         );
     }
